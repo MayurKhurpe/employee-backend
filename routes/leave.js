@@ -1,4 +1,3 @@
-// 📁 backend/routes/leave.js
 const express = require('express');
 const router = express.Router();
 const LeaveRequest = require('../models/LeaveRequest');
@@ -52,7 +51,7 @@ router.post('/', async (req, res) => {
 });
 
 // 2️⃣ PUT: Admin approves a leave
-router.put('/admin/leave/approve/:id', async (req, res) => {
+router.put('/admin/approve/:id', async (req, res) => {
   try {
     const leave = await LeaveRequest.findByIdAndUpdate(
       req.params.id,
@@ -72,7 +71,7 @@ router.put('/admin/leave/approve/:id', async (req, res) => {
 });
 
 // 3️⃣ PUT: Admin rejects a leave with optional note
-router.put('/admin/leave/reject/:id', async (req, res) => {
+router.put('/admin/reject/:id', async (req, res) => {
   const { adminNote } = req.body;
 
   try {
@@ -94,7 +93,7 @@ router.put('/admin/leave/reject/:id', async (req, res) => {
 });
 
 // 4️⃣ GET: Get all leave requests (admin)
-router.get('/admin/leave/all', async (req, res) => {
+router.get('/admin/all', async (req, res) => {
   try {
     const leaves = await LeaveRequest.find().sort({ createdAt: -1 });
     res.json({ success: true, leaves });
