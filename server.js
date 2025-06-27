@@ -33,10 +33,15 @@ app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// ✅ Connect MongoDB (now using .env variable MONGO_URI)
+// ✅ Connect MongoDB
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('✅ MongoDB connected'))
   .catch(err => console.error('❌ DB error:', err));
+
+// ✅ Root Route (optional UI-friendly response)
+app.get('/', (req, res) => {
+  res.send('🎉 Employee Management Backend API is running!');
+});
 
 // ✅ Auth: Login
 app.post('/api/login', async (req, res) => {
@@ -93,7 +98,7 @@ app.post('/api/forgot-password', async (req, res) => {
   user.tokenExpiry = Date.now() + 3600000;
   await user.save();
 
-  const resetLink = `http://localhost:3000/reset-password/${token}`;
+  const resetLink = `http://localhost:3000/reset-password/${token}`; // Replace with frontend URL in production
 
   const transporter = nodemailer.createTransport({
     service: 'gmail',
@@ -135,7 +140,7 @@ app.post('/api/reset-password/:token', async (req, res) => {
   res.json({ message: 'Password reset successful' });
 });
 
-// ✅ Extended Register
+// ✅ Extended Register (with more details)
 app.post('/api/register-request', async (req, res) => {
   const { name, email, password, mobile, department, address, profileImage } = req.body;
   if (!name || !email || !password || !mobile || !department) {
@@ -171,7 +176,7 @@ app.post('/api/approve-user', async (req, res) => {
   }
 });
 
-// ✅ File Upload
+// ✅ Document Upload
 const DocumentSchema = new mongoose.Schema({
   name: String,
   size: String,
@@ -223,7 +228,7 @@ app.delete('/api/documents/:id', async (req, res) => {
   }
 });
 
-// ✅ Use Routes
+// ✅ Use Modular Routes
 app.use('/api/profile', profileRoutes);
 app.use('/api/attendance', attendanceRoute);
 app.use('/api/attendance-stats', attendanceStatsRoute);
@@ -233,7 +238,7 @@ app.use('/api/news', newsRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/holidays', holidayRoutes);
 
-// ✅ Scheduler
+// ✅ Run Cron Jobs
 require('./scheduler');
 
 // ✅ Start Server
