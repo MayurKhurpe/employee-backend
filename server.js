@@ -33,11 +33,9 @@ app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// ✅ Connect MongoDB
-mongoose.connect(
-  'mongodb+srv://hrseekersautomation:Mayur123@mayur.urnkzrg.mongodb.net/employeeDB?retryWrites=true&w=majority&appName=Mayur',
-  { useNewUrlParser: true, useUnifiedTopology: true }
-).then(() => console.log('✅ MongoDB connected'))
+// ✅ Connect MongoDB (now using .env variable MONGO_URI)
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => console.log('✅ MongoDB connected'))
   .catch(err => console.error('❌ DB error:', err));
 
 // ✅ Auth: Login
@@ -59,7 +57,7 @@ app.post('/api/login', async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role || 'employee',
-        profilePic: user.profilePic || user.profileImage || '', // ✅ Added line
+        profilePic: user.profilePic || user.profileImage || '',
       },
     });
   } catch (err) {
