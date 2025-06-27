@@ -1,10 +1,15 @@
 // 📁 middleware/isAdmin.js
 
-// Middleware to check if the authenticated user is an admin
-module.exports = function (req, res, next) {
-  if (req.user && req.user.role === 'admin') {
-    return next();
-  } else {
+const isAdmin = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ message: 'Unauthorized. No user data found.' });
+  }
+
+  if (req.user.role !== 'admin') {
     return res.status(403).json({ message: 'Access denied. Admins only.' });
   }
+
+  next();
 };
+
+module.exports = isAdmin;

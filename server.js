@@ -8,42 +8,34 @@ const bcrypt = require('bcryptjs');
 const multer = require('multer');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
+const helmet = require('helmet');
 const fs = require('fs');
 require('dotenv').config();
 
 const { jwtSecret } = require('./config');
 const User = require('./models/User');
 
-// ✅ Import Routes
-const profileRoutes = require('./routes/profile');
-const attendanceRoute = require('./routes/attendance');
-const attendanceStatsRoute = require('./routes/attendanceStats');
-const leaveRoutes = require('./routes/leave');
-const birthdayRoutes = require('./routes/birthday');
-const newsRoutes = require('./routes/news');
-const adminRoutes = require('./routes/admin');
-const holidayRoutes = require('./routes/holiday');
-
 const app = express();
 const PORT = process.env.PORT || 5000;
-const SECRET_KEY = jwtSecret;
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
 // ✅ Middleware
 app.use(cors());
 app.use(express.json());
+app.use(helmet());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// ✅ Connect MongoDB
+// ✅ MongoDB Connection
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('✅ MongoDB connected'))
-  .catch(err => console.error('❌ DB error:', err));
+  .catch(err => console.error('❌ MongoDB connection error:', err));
 
-// ✅ Root Route (optional UI-friendly response)
+// ✅ Home Route
 app.get('/', (req, res) => {
   res.send('🎉 Employee Management Backend API is running!');
 });
 
-// ✅ Auth: Login
+// 🔐 Login Route
 app.post('/api/login', async (req, res) => {
   const { email, password } = req.body;
   try {
@@ -54,23 +46,24 @@ app.post('/api/login', async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(400).json({ error: 'Invalid credentials' });
 
-    const token = jwt.sign({ userId: user._id, role: user.role }, SECRET_KEY, { expiresIn: '2h' });
+    const token = jwt.sign({ userId: user._id, role: user.role }, jwtSecret, { expiresIn: '2h' });
 
     res.json({
       token,
       user: {
         name: user.name,
         email: user.email,
-        role: user.role || 'employee',
-        profilePic: user.profilePic || user.profileImage || '',
-      },
+        role: user.role,
+        profilePic: user.profilePic || user.profileImage || ''
+      }
     });
   } catch (err) {
+    console.error('Login Error:', err);
     res.status(500).json({ error: 'Server error during login' });
   }
 });
 
-// ✅ Auth: Register
+// 🔐 Register (basic)
 app.post('/api/register', async (req, res) => {
   const { name, email, password } = req.body;
   try {
@@ -78,69 +71,16 @@ app.post('/api/register', async (req, res) => {
     if (existing) return res.status(400).json({ error: 'Email already registered' });
 
     const hashed = await bcrypt.hash(password, 10);
-    const newUser = new User({ name, email, password: hashed, role: 'employee', isApproved: false });
-    await newUser.save();
+    const user = new User({ name, email, password: hashed, isApproved: false });
+    await user.save();
 
     res.json({ message: 'Registration submitted. Awaiting admin approval.' });
   } catch (err) {
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: 'Server error during registration' });
   }
 });
 
-// ✅ Forgot Password
-app.post('/api/forgot-password', async (req, res) => {
-  const { email } = req.body;
-  const user = await User.findOne({ email });
-  if (!user) return res.status(404).json({ error: 'User not found' });
-
-  const token = crypto.randomBytes(32).toString('hex');
-  user.resetToken = token;
-  user.tokenExpiry = Date.now() + 3600000;
-  await user.save();
-
-  const resetLink = `http://localhost:3000/reset-password/${token}`; // Replace with frontend URL in production
-
-  const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: 'your-email@gmail.com',
-      pass: 'your-app-password',
-    },
-  });
-
-  const mailOptions = {
-    from: 'your-email@gmail.com',
-    to: user.email,
-    subject: 'Reset Password',
-    html: `<p>Click <a href="${resetLink}">here</a> to reset your password.</p>`,
-  };
-
-  try {
-    await transporter.sendMail(mailOptions);
-    res.json({ message: 'Email sent' });
-  } catch (err) {
-    res.status(500).json({ error: 'Email sending failed' });
-  }
-});
-
-// ✅ Reset Password
-app.post('/api/reset-password/:token', async (req, res) => {
-  const { token } = req.params;
-  const { password } = req.body;
-
-  const user = await User.findOne({ resetToken: token, tokenExpiry: { $gt: Date.now() } });
-  if (!user) return res.status(400).json({ error: 'Token expired or invalid' });
-
-  const hashed = await bcrypt.hash(password, 10);
-  user.password = hashed;
-  user.resetToken = undefined;
-  user.tokenExpiry = undefined;
-  await user.save();
-
-  res.json({ message: 'Password reset successful' });
-});
-
-// ✅ Extended Register (with more details)
+// 🔐 Register with full data
 app.post('/api/register-request', async (req, res) => {
   const { name, email, password, mobile, department, address, profileImage } = req.body;
   if (!name || !email || !password || !mobile || !department) {
@@ -160,8 +100,62 @@ app.post('/api/register-request', async (req, res) => {
     await user.save();
     res.status(201).json({ message: 'Registration submitted. Awaiting approval' });
   } catch (err) {
+    console.error('Register Request Error:', err);
     res.status(500).json({ error: 'Error saving user' });
   }
+});
+
+// 🔐 Forgot Password
+app.post('/api/forgot-password', async (req, res) => {
+  const { email } = req.body;
+  const user = await User.findOne({ email });
+  if (!user) return res.status(404).json({ error: 'User not found' });
+
+  const token = crypto.randomBytes(32).toString('hex');
+  user.resetToken = token;
+  user.tokenExpiry = Date.now() + 3600000;
+  await user.save();
+
+  const resetLink = `${FRONTEND_URL}/reset-password/${token}`;
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
+    },
+  });
+
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: user.email,
+    subject: '🔐 Reset Your Password',
+    html: `<p>Click <a href="${resetLink}">here</a> to reset your password. This link will expire in 1 hour.</p>`,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    res.json({ message: 'Email sent' });
+  } catch (err) {
+    console.error('Email error:', err);
+    res.status(500).json({ error: 'Failed to send email' });
+  }
+});
+
+// 🔐 Reset Password
+app.post('/api/reset-password/:token', async (req, res) => {
+  const { token } = req.params;
+  const { password } = req.body;
+
+  const user = await User.findOne({ resetToken: token, tokenExpiry: { $gt: Date.now() } });
+  if (!user) return res.status(400).json({ error: 'Token expired or invalid' });
+
+  const hashed = await bcrypt.hash(password, 10);
+  user.password = hashed;
+  user.resetToken = undefined;
+  user.tokenExpiry = undefined;
+  await user.save();
+
+  res.json({ message: 'Password reset successful' });
 });
 
 // ✅ Admin Approval
@@ -170,13 +164,13 @@ app.post('/api/approve-user', async (req, res) => {
   try {
     const user = await User.findOneAndUpdate({ email }, { isApproved: true }, { new: true });
     if (!user) return res.status(404).json({ error: 'User not found' });
-    res.json({ message: 'User approved' });
+    res.json({ message: 'User approved successfully' });
   } catch (err) {
-    res.status(500).json({ error: 'Approval failed' });
+    res.status(500).json({ error: 'Failed to approve user' });
   }
 });
 
-// ✅ Document Upload
+// 📁 Document Upload
 const DocumentSchema = new mongoose.Schema({
   name: String,
   size: String,
@@ -228,18 +222,20 @@ app.delete('/api/documents/:id', async (req, res) => {
   }
 });
 
-// ✅ Use Modular Routes
-app.use('/api/profile', profileRoutes);
-app.use('/api/attendance', attendanceRoute);
-app.use('/api/attendance-stats', attendanceStatsRoute);
-app.use('/api/leave', leaveRoutes);
-app.use('/api/birthdays', birthdayRoutes);
-app.use('/api/news', newsRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/holidays', holidayRoutes);
+// ✅ Other Routes
+app.use('/api/profile', require('./routes/profile'));
+app.use('/api/attendance', require('./routes/attendance'));
+app.use('/api/attendance-stats', require('./routes/attendanceStats'));
+app.use('/api/leave', require('./routes/leave'));
+app.use('/api/birthdays', require('./routes/birthday'));
+app.use('/api/news', require('./routes/news'));
+app.use('/api/admin', require('./routes/admin'));
+app.use('/api/holidays', require('./routes/holiday'));
 
-// ✅ Run Cron Jobs
+// ⏰ Scheduler
 require('./scheduler');
 
-// ✅ Start Server
-app.listen(PORT, () => console.log(`🚀 Server running at http://localhost:${PORT}`));
+// 🚀 Start Server
+app.listen(PORT, () => {
+  console.log(`🚀 Server running at http://localhost:${PORT}`);
+});
