@@ -238,11 +238,5 @@ app.use('/api/holidays', holidayRoutes);
 // ✅ Scheduler
 require('./scheduler');
 
-// ✅ Serve React frontend build
-app.use(express.static(path.join(__dirname, 'build')));
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'build', 'index.html'));
-});
-
 // ✅ Start Server
 app.listen(PORT, () => console.log(`🚀 Server running at http://localhost:${PORT}`));
