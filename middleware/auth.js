@@ -1,29 +1,20 @@
-// 📁 middleware/authMiddleware.js
+// 📁 middleware/auth.js
 const jwt = require("jsonwebtoken");
 
 /**
  * Middleware to verify JWT and extract user data
- * @route   Protected
- * @header  Authorization: Bearer <token>
  */
-const authMiddleware = (req, res, next) => {
+const protect = (req, res, next) => {
   const authHeader = req.header("Authorization");
-
-  // 🚫 Check for missing or malformed token
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return res
-      .status(401)
-      .json({ message: "🚫 Access denied. Token missing or malformed." });
+    return res.status(401).json({ message: "🚫 Access denied. Token missing or malformed." });
   }
 
   const token = authHeader.split(" ")[1];
 
   try {
-    // 🔐 Verify token using secret from .env (with fallback)
     const secret = process.env.JWT_SECRET || "your_jwt_secret";
     const decoded = jwt.verify(token, secret);
-
-    // 🧾 Attach user info to request object
     req.user = decoded;
     next();
   } catch (err) {
@@ -32,4 +23,15 @@ const authMiddleware = (req, res, next) => {
   }
 };
 
-module.exports = authMiddleware;
+/**
+ * Middleware to allow only admins
+ */
+const isAdmin = (req, res, next) => {
+  if (req.user && req.user.role === "admin") {
+    next();
+  } else {
+    return res.status(403).json({ message: "🚫 Access denied. Admins only." });
+  }
+};
+
+module.exports = { protect, isAdmin };
