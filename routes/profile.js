@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const auth = require('../middleware/authMiddleware');
+const { protect } = require('../middleware/authMiddleware');
 const multer = require('multer');
 const path = require('path');
 const profileController = require('../controllers/profileController');
@@ -14,9 +14,9 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 // ✅ Profile Routes
-router.get('/', auth, profileController.getProfile);
+router.get('/', protect, profileController.getProfile);
 
-router.put('/', auth, async (req, res, next) => {
+router.put('/', protect, async (req, res, next) => {
   await profileController.updateProfile(req, res, async () => {
     await AuditLog.create({
       user: req.user,
@@ -28,7 +28,7 @@ router.put('/', auth, async (req, res, next) => {
   });
 });
 
-router.post('/upload', auth, upload.single('profileImage'), async (req, res, next) => {
+router.post('/upload', protect, upload.single('profileImage'), async (req, res, next) => {
   await profileController.uploadProfilePicture(req, res, async () => {
     await AuditLog.create({
       user: req.user,
