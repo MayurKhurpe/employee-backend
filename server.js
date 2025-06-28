@@ -4,11 +4,9 @@ const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
 const path = require('path');
 const bcrypt = require('bcryptjs');
-const multer = require('multer');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const helmet = require('helmet');
-const fs = require('fs');
 require('dotenv').config();
 
 const { jwtSecret } = require('./config');
@@ -173,58 +171,6 @@ app.post('/api/approve-user', protect, isAdmin, async (req, res) => {
     res.json({ message: 'User approved successfully' });
   } catch (err) {
     res.status(500).json({ error: 'Failed to approve user' });
-  }
-});
-
-// 📁 Document Upload
-const DocumentSchema = new mongoose.Schema({
-  name: String,
-  size: String,
-  type: String,
-  filePath: String,
-  uploadedAt: { type: Date, default: Date.now },
-});
-const Document = mongoose.model('Document', DocumentSchema);
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, 'uploads/'),
-  filename: (req, file, cb) => cb(null, Date.now() + '-' + file.originalname),
-});
-const upload = multer({ storage });
-
-app.post('/api/upload', protect, upload.single('file'), async (req, res) => {
-  try {
-    const file = req.file;
-    const doc = new Document({
-      name: file.originalname,
-      size: (file.size / 1024).toFixed(1) + ' KB',
-      type: file.mimetype,
-      filePath: file.path,
-    });
-    await doc.save();
-    res.status(201).json(doc);
-  } catch (err) {
-    res.status(500).json({ error: 'Upload failed' });
-  }
-});
-
-app.get('/api/documents', protect, async (req, res) => {
-  try {
-    const { sortBy = 'uploadedAt', order = 'desc' } = req.query;
-    const docs = await Document.find().sort({ [sortBy]: order === 'asc' ? 1 : -1 });
-    res.json(docs);
-  } catch (err) {
-    res.status(500).json({ error: 'Fetch error' });
-  }
-});
-
-app.delete('/api/documents/:id', protect, isAdmin, async (req, res) => {
-  try {
-    const doc = await Document.findByIdAndDelete(req.params.id);
-    if (doc && fs.existsSync(doc.filePath)) fs.unlinkSync(doc.filePath);
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: 'Delete failed' });
   }
 });
 

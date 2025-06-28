@@ -52,14 +52,12 @@ router.get('/stats', async (req, res) => {
     const [
       totalUsers,
       pendingUsers,
-      totalDocuments,
       totalLeaves,
       pendingLeaves,
       todayCheckIns,
     ] = await Promise.all([
       User.countDocuments(),
       User.countDocuments({ isApproved: false }),
-      Document.countDocuments(),
       LeaveRequest.countDocuments(),
       LeaveRequest.countDocuments({ status: 'Pending' }),
       Attendance.countDocuments({
@@ -73,7 +71,6 @@ router.get('/stats', async (req, res) => {
     res.json({
       totalUsers,
       pendingUsers,
-      totalDocuments,
       totalLeaves,
       pendingLeaves,
       todayCheckIns,
