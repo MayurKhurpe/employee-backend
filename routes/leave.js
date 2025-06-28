@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const auth = require('../middleware/auth');
+const { protect, isAdmin } = require('../middleware/auth');
 const isAdmin = require('../middleware/isAdmin');
 const leaveController = require('../controllers/leaveController');
 const AuditLog = require('../models/AuditLog');
@@ -18,7 +18,7 @@ const transporter = nodemailer.createTransport({
 });
 
 // ✅ Apply Leave
-router.post('/', auth, async (req, res, next) => {
+router.post('/', protect, async (req, res, next) => {
   await leaveController.applyLeave(req, res, async () => {
     await AuditLog.create({
       user: req.user,
