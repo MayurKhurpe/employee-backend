@@ -19,8 +19,16 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
+// ✅ Updated CORS setup for both local & live frontend
+app.use(cors({
+  origin: [
+    'http://localhost:3000', // local React app
+    'https://employee-web-kifp.onrender.com' // live deployed frontend (Render)
+  ],
+  credentials: true
+}));
+
 // ✅ Middleware
-app.use(cors());
 app.use(express.json());
 app.use(helmet());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));

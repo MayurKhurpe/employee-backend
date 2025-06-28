@@ -57,6 +57,7 @@ exports.markAttendance = async (req, res) => {
 
     res.status(201).json({ message: 'Attendance marked successfully.', attendance: newAttendance });
   } catch (err) {
+    console.error('❌ Attendance Marking Failed:', err); //
     res.status(500).json({ message: 'Error marking attendance.', error: err.message });
   }
 };
