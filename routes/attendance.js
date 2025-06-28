@@ -1,12 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const authMiddleware = require('../middleware/auth');
-const isAdmin = require('../middleware/isAdmin');
+const { protect, isAdmin } = require('../middleware/auth'); // ✅ FIXED
 const attendanceController = require('../controllers/attendanceController');
 const AuditLog = require('../models/AuditLog');
 
 // ✅ Mark Attendance
-router.post('/mark', authMiddleware, async (req, res, next) => {
+router.post('/mark', protect, async (req, res, next) => {
   await attendanceController.markAttendance(req, res, async () => {
     await AuditLog.create({
       user: req.user,
@@ -18,11 +17,11 @@ router.post('/mark', authMiddleware, async (req, res, next) => {
   });
 });
 
-router.get('/my', authMiddleware, attendanceController.getMyAttendance);
-router.get('/all', authMiddleware, isAdmin, attendanceController.getAllAttendance);
-router.get('/user/:userId', authMiddleware, isAdmin, attendanceController.getUserAttendance);
+router.get('/my', protect, attendanceController.getMyAttendance);
+router.get('/all', protect, isAdmin, attendanceController.getAllAttendance);
+router.get('/user/:userId', protect, isAdmin, attendanceController.getUserAttendance);
 
-router.patch('/:id', authMiddleware, async (req, res, next) => {
+router.patch('/:id', protect, async (req, res, next) => {
   await attendanceController.updateCheckout(req, res, async () => {
     await AuditLog.create({
       user: req.user,
@@ -34,6 +33,6 @@ router.patch('/:id', authMiddleware, async (req, res, next) => {
   });
 });
 
-router.get('/summary', authMiddleware, isAdmin, attendanceController.getSummary);
+router.get('/summary', protect, isAdmin, attendanceController.getSummary);
 
 module.exports = router;
