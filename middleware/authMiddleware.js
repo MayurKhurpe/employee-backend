@@ -1,8 +1,8 @@
-// 📁 middleware/authMiddleware.js
 const jwt = require("jsonwebtoken");
-const { jwtSecret } = require("../config"); // Ensure config file has the secret
+const { jwtSecret } = require("../config");
 
-const authMiddleware = (req, res, next) => {
+// ✅ Middleware to verify JWT token
+const protect = (req, res, next) => {
   const authHeader = req.header("Authorization");
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -13,11 +13,20 @@ const authMiddleware = (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, jwtSecret);
-    req.user = decoded;
+    req.user = decoded; // Contains { userId, role }
     next();
   } catch (err) {
     return res.status(401).json({ message: "❌ Invalid or expired token." });
   }
 };
 
-module.exports = authMiddleware;
+// ✅ Middleware to allow only admins
+const isAdmin = (req, res, next) => {
+  if (req.user && req.user.role === "admin") {
+    next();
+  } else {
+    res.status(403).json({ message: "⛔ Admin access only." });
+  }
+};
+
+module.exports = { protect, isAdmin };

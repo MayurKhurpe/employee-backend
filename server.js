@@ -1,4 +1,3 @@
-// 📁 server.js
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
@@ -14,18 +13,19 @@ require('dotenv').config();
 
 const { jwtSecret } = require('./config');
 const User = require('./models/User');
+const { protect, isAdmin } = require('./middleware/authMiddleware');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
-// ✅ Updated CORS setup for both local & live frontend
+// ✅ CORS
 app.use(cors({
   origin: [
-    'http://localhost:3000', // local React app
-    'https://employee-web-kifp.onrender.com' // live deployed frontend (Render)
+    'http://localhost:3000',
+    'https://employee-web-kifp.onrender.com',
   ],
-  credentials: true
+  credentials: true,
 }));
 
 // ✅ Middleware
@@ -33,17 +33,17 @@ app.use(express.json());
 app.use(helmet());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// ✅ MongoDB Connection
+// ✅ MongoDB
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('✅ MongoDB connected'))
-  .catch(err => console.error('❌ MongoDB connection error:', err));
+  .catch(err => console.error('❌ MongoDB error:', err));
 
 // ✅ Home Route
 app.get('/', (req, res) => {
   res.send('🎉 Employee Management Backend API is running!');
 });
 
-// 🔐 Login Route
+// 🔐 Login
 app.post('/api/login', async (req, res) => {
   const { email, password } = req.body;
   try {
@@ -62,16 +62,16 @@ app.post('/api/login', async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
-        profilePic: user.profilePic || user.profileImage || ''
-      }
+        profilePic: user.profilePic || user.profileImage || '',
+      },
     });
   } catch (err) {
-    console.error('Login Error:', err);
-    res.status(500).json({ error: 'Server error during login' });
+    console.error('Login error:', err);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
-// 🔐 Register (basic)
+// 🔐 Register (simple)
 app.post('/api/register', async (req, res) => {
   const { name, email, password } = req.body;
   try {
@@ -88,7 +88,7 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-// 🔐 Register with full data
+// 🔐 Register with full fields
 app.post('/api/register-request', async (req, res) => {
   const { name, email, password, mobile, department, address, profileImage } = req.body;
   if (!name || !email || !password || !mobile || !department) {
@@ -102,13 +102,12 @@ app.post('/api/register-request', async (req, res) => {
     const hashed = await bcrypt.hash(password, 10);
     const user = new User({
       name, email, password: hashed, mobile, department, address, profileImage,
-      role: 'employee', isApproved: false
+      role: 'employee', isApproved: false,
     });
 
     await user.save();
     res.status(201).json({ message: 'Registration submitted. Awaiting approval' });
   } catch (err) {
-    console.error('Register Request Error:', err);
     res.status(500).json({ error: 'Error saving user' });
   }
 });
@@ -137,14 +136,13 @@ app.post('/api/forgot-password', async (req, res) => {
     from: process.env.EMAIL_USER,
     to: user.email,
     subject: '🔐 Reset Your Password',
-    html: `<p>Click <a href="${resetLink}">here</a> to reset your password. This link will expire in 1 hour.</p>`,
+    html: `<p>Click <a href="${resetLink}">here</a> to reset your password. This link expires in 1 hour.</p>`,
   };
 
   try {
     await transporter.sendMail(mailOptions);
     res.json({ message: 'Email sent' });
   } catch (err) {
-    console.error('Email error:', err);
     res.status(500).json({ error: 'Failed to send email' });
   }
 });
@@ -166,8 +164,8 @@ app.post('/api/reset-password/:token', async (req, res) => {
   res.json({ message: 'Password reset successful' });
 });
 
-// ✅ Admin Approval
-app.post('/api/approve-user', async (req, res) => {
+// ✅ Admin Approval (secured)
+app.post('/api/approve-user', protect, isAdmin, async (req, res) => {
   const { email } = req.body;
   try {
     const user = await User.findOneAndUpdate({ email }, { isApproved: true }, { new: true });
@@ -194,7 +192,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-app.post('/api/upload', upload.single('file'), async (req, res) => {
+app.post('/api/upload', protect, upload.single('file'), async (req, res) => {
   try {
     const file = req.file;
     const doc = new Document({
@@ -210,7 +208,7 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
   }
 });
 
-app.get('/api/documents', async (req, res) => {
+app.get('/api/documents', protect, async (req, res) => {
   try {
     const { sortBy = 'uploadedAt', order = 'desc' } = req.query;
     const docs = await Document.find().sort({ [sortBy]: order === 'asc' ? 1 : -1 });
@@ -220,7 +218,7 @@ app.get('/api/documents', async (req, res) => {
   }
 });
 
-app.delete('/api/documents/:id', async (req, res) => {
+app.delete('/api/documents/:id', protect, isAdmin, async (req, res) => {
   try {
     const doc = await Document.findByIdAndDelete(req.params.id);
     if (doc && fs.existsSync(doc.filePath)) fs.unlinkSync(doc.filePath);
@@ -230,15 +228,19 @@ app.delete('/api/documents/:id', async (req, res) => {
   }
 });
 
-// ✅ Other Routes
-app.use('/api/profile', require('./routes/profile'));
-app.use('/api/attendance', require('./routes/attendance'));
-app.use('/api/attendance-stats', require('./routes/attendanceStats'));
-app.use('/api/leave', require('./routes/leave'));
-app.use('/api/birthdays', require('./routes/birthday'));
-app.use('/api/news', require('./routes/news'));
-app.use('/api/admin', require('./routes/admin'));
-app.use('/api/holidays', require('./routes/holiday'));
+// ✅ Protected Routes (login required)
+app.use('/api/profile', protect, require('./routes/profile'));
+app.use('/api/attendance', protect, require('./routes/attendance'));
+app.use('/api/attendance-stats', protect, require('./routes/attendanceStats'));
+app.use('/api/leave', protect, require('./routes/leave'));
+app.use('/api/birthdays', protect, require('./routes/birthday'));
+app.use('/api/news', protect, require('./routes/news'));
+app.use('/api/holidays', protect, require('./routes/holiday'));
+app.use('/api/admin/broadcasts', require('./routes/broadcast'));
+
+
+// ✅ Admin-only routes
+app.use('/api/admin', protect, isAdmin, require('./routes/admin'));
 
 // ⏰ Scheduler
 require('./scheduler');

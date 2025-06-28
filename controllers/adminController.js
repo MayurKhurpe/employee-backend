@@ -1,5 +1,6 @@
 // 📁 controllers/adminController.js
 const User = require('../models/User');
+const { Parser } = require('json2csv');
 
 // ✅ Get all unapproved users
 exports.getPendingUsers = async (req, res) => {
@@ -45,5 +46,24 @@ exports.rejectUser = async (req, res) => {
   } catch (err) {
     console.error('Error rejecting user:', err);
     res.status(500).json({ error: 'Failed to reject user' });
+  }
+};
+
+// 📤 Export all approved users to CSV
+exports.exportUsers = async (req, res) => {
+  try {
+    const users = await User.find({ isApproved: true }).select('name email role createdAt');
+
+    const fields = ['name', 'email', 'role', 'createdAt'];
+    const opts = { fields };
+    const parser = new Parser(opts);
+    const csv = parser.parse(users);
+
+    res.header('Content-Type', 'text/csv');
+    res.attachment('users.csv');
+    return res.send(csv);
+  } catch (err) {
+    console.error('❌ Export users error:', err);
+    res.status(500).json({ error: 'Failed to export users' });
   }
 };

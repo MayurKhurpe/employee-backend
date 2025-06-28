@@ -4,6 +4,7 @@ const auth = require('../middleware/authMiddleware');
 const multer = require('multer');
 const path = require('path');
 const profileController = require('../controllers/profileController');
+const AuditLog = require('../models/AuditLog');
 
 // 📁 Upload Config
 const storage = multer.diskStorage({
@@ -14,7 +15,29 @@ const upload = multer({ storage });
 
 // ✅ Profile Routes
 router.get('/', auth, profileController.getProfile);
-router.put('/', auth, profileController.updateProfile);
-router.post('/upload', auth, upload.single('profileImage'), profileController.uploadProfilePicture);
+
+router.put('/', auth, async (req, res, next) => {
+  await profileController.updateProfile(req, res, async () => {
+    await AuditLog.create({
+      user: req.user,
+      action: 'Updated Profile',
+      details: `Updated fields: ${Object.keys(req.body).join(', ')}`,
+      ip: req.ip,
+    });
+    next();
+  });
+});
+
+router.post('/upload', auth, upload.single('profileImage'), async (req, res, next) => {
+  await profileController.uploadProfilePicture(req, res, async () => {
+    await AuditLog.create({
+      user: req.user,
+      action: 'Uploaded Profile Picture',
+      details: req.file?.filename || 'No file name',
+      ip: req.ip,
+    });
+    next();
+  });
+});
 
 module.exports = router;
