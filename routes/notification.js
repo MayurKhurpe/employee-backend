@@ -2,15 +2,14 @@
 const express = require('express');
 const router = express.Router();
 const NotificationSetting = require('../models/NotificationSetting');
-const authMiddleware = require('../middleware/authMiddleware');
+const { protect } = require('../middleware/auth'); // ✅ Use consistent middleware import
 
 // ✅ GET: Fetch current user's notification settings
-router.get('/', authMiddleware, async (req, res) => {
+router.get('/', protect, async (req, res) => {
   try {
     const setting = await NotificationSetting.findOne({ userId: req.user.id });
 
     if (!setting) {
-      // If not found, return defaults (not create in DB until user saves)
       return res.json({
         emailNotif: false,
         pushNotif: false,
@@ -28,7 +27,7 @@ router.get('/', authMiddleware, async (req, res) => {
 });
 
 // ✅ PUT: Update or create user's notification settings
-router.put('/', authMiddleware, async (req, res) => {
+router.put('/', protect, async (req, res) => {
   try {
     const { emailNotif = false, pushNotif = false } = req.body;
 
