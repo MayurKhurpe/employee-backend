@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const { protect, isAdmin } = require('../middleware/auth');
-const isAdmin = require('../middleware/isAdmin');
 const leaveController = require('../controllers/leaveController');
 const AuditLog = require('../models/AuditLog');
 const NotificationSetting = require('../models/NotificationSetting');
