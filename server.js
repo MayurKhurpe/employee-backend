@@ -17,11 +17,12 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
-// ✅ CORS
+// ✅ CORS Setup - Add your deployed frontend here
 app.use(cors({
   origin: [
     'http://localhost:3000',
-    'https://employee-web-kifp.onrender.com',
+    'https://employee-web-kifp.onrender.com', // optional
+    'https://employee-web-mu.vercel.app',     // ✅ your Vercel frontend
   ],
   credentials: true,
 }));
@@ -31,7 +32,7 @@ app.use(express.json());
 app.use(helmet());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// ✅ MongoDB
+// ✅ MongoDB Connection
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('✅ MongoDB connected'))
   .catch(err => console.error('❌ MongoDB error:', err));
@@ -69,7 +70,7 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// 🔐 Register (simple)
+// 🔐 Register - Simple
 app.post('/api/register', async (req, res) => {
   const { name, email, password } = req.body;
   try {
@@ -86,7 +87,7 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-// 🔐 Register with full fields
+// 🔐 Register - With Full Fields
 app.post('/api/register-request', async (req, res) => {
   const { name, email, password, mobile, department, address, profileImage } = req.body;
   if (!name || !email || !password || !mobile || !department) {
@@ -162,7 +163,7 @@ app.post('/api/reset-password/:token', async (req, res) => {
   res.json({ message: 'Password reset successful' });
 });
 
-// ✅ Admin Approval (secured)
+// ✅ Admin Approval
 app.post('/api/approve-user', protect, isAdmin, async (req, res) => {
   const { email } = req.body;
   try {
@@ -174,7 +175,7 @@ app.post('/api/approve-user', protect, isAdmin, async (req, res) => {
   }
 });
 
-// ✅ Protected Routes
+// ✅ Feature Routes
 app.use('/api/profile', protect, require('./routes/profile'));
 app.use('/api/attendance', protect, require('./routes/attendance'));
 app.use('/api/attendance-stats', protect, require('./routes/attendanceStats'));
@@ -183,17 +184,13 @@ app.use('/api/birthdays', protect, require('./routes/birthday'));
 app.use('/api/news', protect, require('./routes/news'));
 app.use('/api/holidays', protect, require('./routes/holiday'));
 app.use('/api/admin/broadcasts', require('./routes/broadcast'));
-
-// ✅ Notification Settings (added)
 app.use('/api/notification-settings', protect, require('./routes/notification'));
-
-// ✅ Admin-only routes
 app.use('/api/admin', protect, isAdmin, require('./routes/admin'));
 
-// ⏰ Scheduler
+// ⏰ Daily Scheduler
 require('./scheduler');
 
-// 🚀 Start Server
+// 🚀 Start the Server
 app.listen(PORT, () => {
   console.log(`🚀 Server running at http://localhost:${PORT}`);
 });
