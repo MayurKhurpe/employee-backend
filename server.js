@@ -228,7 +228,7 @@ app.delete('/api/documents/:id', protect, isAdmin, async (req, res) => {
   }
 });
 
-// ✅ Protected Routes (login required)
+// ✅ Protected Routes
 app.use('/api/profile', protect, require('./routes/profile'));
 app.use('/api/attendance', protect, require('./routes/attendance'));
 app.use('/api/attendance-stats', protect, require('./routes/attendanceStats'));
@@ -238,6 +238,8 @@ app.use('/api/news', protect, require('./routes/news'));
 app.use('/api/holidays', protect, require('./routes/holiday'));
 app.use('/api/admin/broadcasts', require('./routes/broadcast'));
 
+// ✅ Notification Settings (added)
+app.use('/api/notification-settings', protect, require('./routes/notification'));
 
 // ✅ Admin-only routes
 app.use('/api/admin', protect, isAdmin, require('./routes/admin'));

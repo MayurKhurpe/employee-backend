@@ -4,6 +4,7 @@ const User = require('../models/User');
 const nodemailer = require('nodemailer');
 require('dotenv').config();
 
+// Setup email transporter
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
@@ -12,14 +13,20 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+// Helper: get start of day for date comparisons (to ensure consistent UTC midnight)
+const getStartOfDay = (date) => {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
+
 // ✅ Mark Today's Attendance
 exports.markAttendance = async (req, res) => {
   try {
     const userId = req.user.userId;
     const { status = 'Present', location, checkInTime } = req.body;
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = getStartOfDay(new Date());
 
     const alreadyMarked = await Attendance.findOne({ userId, date: today });
     if (alreadyMarked) {
@@ -50,14 +57,14 @@ exports.markAttendance = async (req, res) => {
         html: `
           <p><strong>${user.name}</strong> was marked <strong>Absent</strong> today.</p>
           <p><strong>Email:</strong> ${user.email}</p>
-          <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+          <p><strong>Date:</strong> ${today.toLocaleDateString()}</p>
         `,
       });
     }
 
     res.status(201).json({ message: 'Attendance marked successfully.', attendance: newAttendance });
   } catch (err) {
-    console.error('❌ Attendance Marking Failed:', err); //
+    console.error('❌ Attendance Marking Failed:', err);
     res.status(500).json({ message: 'Error marking attendance.', error: err.message });
   }
 };
@@ -76,7 +83,9 @@ exports.getMyAttendance = async (req, res) => {
 // ✅ Admin: Get All Attendance
 exports.getAllAttendance = async (req, res) => {
   try {
-    const records = await Attendance.find().populate('userId', 'name email').sort({ date: -1 });
+    const records = await Attendance.find()
+      .populate('userId', 'name email')
+      .sort({ date: -1 });
     res.json(records);
   } catch (err) {
     res.status(500).json({ message: 'Error fetching all attendance.', error: err.message });
@@ -100,6 +109,7 @@ exports.updateCheckout = async (req, res) => {
     const attendance = await Attendance.findById(req.params.id);
     if (!attendance) return res.status(404).json({ message: 'Attendance not found' });
 
+    // Security: Only user who marked attendance can update checkout
     if (attendance.userId.toString() !== req.user.userId) {
       return res.status(403).json({ message: 'Unauthorized' });
     }
@@ -113,15 +123,15 @@ exports.updateCheckout = async (req, res) => {
   }
 };
 
-// ✅ Admin: Summary Stats
+// ✅ Admin: Summary Stats for Today
 exports.getSummary = async (req, res) => {
   try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = getStartOfDay(new Date());
 
     const allUsers = await User.find({});
     const todayRecords = await Attendance.find({ date: today });
 
+    // Count attendance status types
     const todayPresent = todayRecords.filter((r) => r.status === 'Present').length;
     const todayAbsent = todayRecords.filter((r) => r.status === 'Absent').length;
     const todayHalfDay = todayRecords.filter((r) => r.status === 'Half Day').length;

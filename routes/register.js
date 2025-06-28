@@ -4,17 +4,22 @@ const User = require('../models/User');
 
 const router = express.Router();
 
-// Register route
+// POST /api/register
 router.post('/', async (req, res) => {
   const { name, email, password } = req.body;
 
   try {
+    // Check if email already exists
     const existingUser = await User.findOne({ email });
-    if (existingUser) return res.status(400).json({ error: 'Email already registered' });
+    if (existingUser) {
+      return res.status(400).json({ error: 'Email already registered' });
+    }
 
+    // Hash the password
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
+    // Create new user document
     const newUser = new User({
       name,
       email,
@@ -22,8 +27,8 @@ router.post('/', async (req, res) => {
     });
 
     await newUser.save();
-    res.json({ message: 'User registered successfully' });
 
+    res.status(201).json({ message: 'User registered successfully' });
   } catch (err) {
     console.error('Register error:', err);
     res.status(500).json({ error: 'Something went wrong' });
