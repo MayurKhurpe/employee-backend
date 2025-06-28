@@ -1,3 +1,4 @@
+// 📁 routes/profile.js
 const express = require('express');
 const router = express.Router();
 const { protect } = require('../middleware/authMiddleware');
@@ -7,15 +8,16 @@ const profileController = require('../controllers/profileController');
 const AuditLog = require('../models/AuditLog');
 const NotificationSetting = require('../models/NotificationSetting');
 const User = require('../models/User');
+require('dotenv').config();
 
-// Multer storage config for uploads/
+// 📂 Multer Storage Config
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, 'uploads/'),
   filename: (req, file, cb) => cb(null, Date.now() + '-' + file.originalname),
 });
 const upload = multer({ storage });
 
-// Nodemailer setup
+// 📧 Nodemailer Setup
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
@@ -24,10 +26,10 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// GET profile of logged-in user
+// ✅ GET Logged-in User Profile
 router.get('/', protect, profileController.getProfile);
 
-// UPDATE profile with audit and optional email notification
+// ✅ UPDATE Profile
 router.put('/', protect, async (req, res, next) => {
   await profileController.updateProfile(req, res, async () => {
     await AuditLog.create({
@@ -37,23 +39,25 @@ router.put('/', protect, async (req, res, next) => {
       ip: req.ip,
     });
 
-    // Email notification if enabled
+    // 📧 Optional Email Notification
     const setting = await NotificationSetting.findOne({ userId: req.user.id });
     if (setting?.emailNotif) {
       const user = await User.findById(req.user.id);
-      await transporter.sendMail({
-        from: process.env.EMAIL_USER,
-        to: user.email,
-        subject: '📋 Your Profile was Updated',
-        html: `<p>Hello ${user.name},<br>Your profile was successfully updated on ${new Date().toLocaleString()}.</p>`,
-      });
+      if (user) {
+        await transporter.sendMail({
+          from: process.env.EMAIL_USER,
+          to: user.email,
+          subject: '📋 Your Profile was Updated',
+          html: `<p>Hello ${user.name},<br>Your profile was successfully updated on ${new Date().toLocaleString()}.</p>`,
+        });
+      }
     }
 
     next();
   });
 });
 
-// UPLOAD profile picture with audit log
+// ✅ UPLOAD Profile Picture
 router.post('/upload', protect, upload.single('profileImage'), async (req, res, next) => {
   await profileController.uploadProfilePicture(req, res, async () => {
     await AuditLog.create({

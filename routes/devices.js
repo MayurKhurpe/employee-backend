@@ -1,4 +1,3 @@
-// 📁 routes/devices.js
 const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../middleware/auth');
@@ -22,12 +21,12 @@ let devices = [
 ];
 
 // ✅ GET all linked devices
-router.get('/devices', authMiddleware, (req, res) => {
+router.get('/', authMiddleware, (req, res) => {
   res.json(devices);
 });
 
 // ✅ DELETE (unlink) a device by ID
-router.delete('/devices/:id', authMiddleware, async (req, res) => {
+router.delete('/:id', authMiddleware, async (req, res) => {
   const id = parseInt(req.params.id);
   const removedDevice = devices.find(d => d.id === id);
   devices = devices.filter(d => d.id !== id);
