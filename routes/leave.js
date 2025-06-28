@@ -45,7 +45,7 @@ router.post('/', protect, async (req, res, next) => {
 });
 
 // ✅ Approve
-router.put('/admin/approve/:id', auth, isAdmin, async (req, res, next) => {
+router.put('/admin/approve/:id', protect, isAdmin, async (req, res, next) => {
   await leaveController.approveLeave(req, res, async () => {
     await AuditLog.create({
       user: req.user,
