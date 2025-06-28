@@ -74,7 +74,7 @@ router.put('/admin/approve/:id', protect, isAdmin, async (req, res, next) => {
 });
 
 // ❌ Reject
-router.put('/admin/reject/:id', auth, isAdmin, async (req, res, next) => {
+router.put('/admin/reject/:id', protect, isAdmin, async (req, res, next) => {
   await leaveController.rejectLeave(req, res, async () => {
     await AuditLog.create({
       user: req.user,
@@ -103,6 +103,6 @@ router.put('/admin/reject/:id', auth, isAdmin, async (req, res, next) => {
 });
 
 // ✅ View All
-router.get('/admin/all', auth, isAdmin, leaveController.getAllLeaves);
+router.get('/admin/all', protect, isAdmin, leaveController.getAllLeaves);
 
 module.exports = router;
