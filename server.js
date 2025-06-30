@@ -17,15 +17,28 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
-// ✅ CORS Setup - Add your deployed frontend here
-app.use(cors({
-  origin: [
-    'http://localhost:3000',
-    'https://employee-web-kifp.onrender.com', // optional
-    'https://employee-web-mu.vercel.app',     // ✅ your Vercel frontend
-  ],
+// ✅ CORS Setup – with preflight + Vercel support
+const corsOptions = {
+  origin: function (origin, callback) {
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'https://employee-web-kifp.onrender.com',
+      'https://employee-web-mu.vercel.app',
+    ];
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('❌ Not allowed by CORS'));
+    }
+  },
   credentials: true,
-}));
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  optionsSuccessStatus: 200,
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions)); // handle preflight
 
 // ✅ Middleware
 app.use(express.json());
@@ -190,7 +203,7 @@ app.use('/api/admin', protect, isAdmin, require('./routes/admin'));
 // ⏰ Daily Scheduler
 require('./scheduler');
 
-// 🚀 Start the Server
+// 🚀 Start Server
 app.listen(PORT, () => {
   console.log(`🚀 Server running at http://localhost:${PORT}`);
 });
