@@ -1,10 +1,11 @@
 // 📁 middleware/auth.js
 const jwt = require("jsonwebtoken");
+const User = require("../models/User"); // ✅ make sure this is imported
 
 /**
- * Middleware to verify JWT and extract user data
+ * Middleware to verify JWT and extract full user data
  */
-const protect = (req, res, next) => {
+const protect = async (req, res, next) => {
   const authHeader = req.header("Authorization");
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return res.status(401).json({ message: "🚫 Access denied. Token missing or malformed." });
@@ -15,7 +16,21 @@ const protect = (req, res, next) => {
   try {
     const secret = process.env.JWT_SECRET || "your_jwt_secret";
     const decoded = jwt.verify(token, secret);
-    req.user = decoded;
+
+    // ✅ Fetch full user info (name, email, role, etc.)
+    const user = await User.findById(decoded.userId).select("name email role");
+
+    if (!user) {
+      return res.status(401).json({ message: "❌ User not found" });
+    }
+
+    req.user = {
+      userId: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+    };
+
     next();
   } catch (err) {
     console.error("❌ JWT verification error:", err.message);

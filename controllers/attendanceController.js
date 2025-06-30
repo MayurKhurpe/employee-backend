@@ -13,7 +13,7 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// Helper: get start of day for date comparisons (to ensure consistent UTC midnight)
+// Helper: get start of day for date comparisons (UTC midnight)
 const getStartOfDay = (date) => {
   const d = new Date(date);
   d.setHours(0, 0, 0, 0);
@@ -25,7 +25,6 @@ exports.markAttendance = async (req, res) => {
   try {
     const userId = req.user.userId;
     const { status = 'Present', location, checkInTime } = req.body;
-
     const today = getStartOfDay(new Date());
 
     const alreadyMarked = await Attendance.findOne({ userId, date: today });
@@ -109,7 +108,6 @@ exports.updateCheckout = async (req, res) => {
     const attendance = await Attendance.findById(req.params.id);
     if (!attendance) return res.status(404).json({ message: 'Attendance not found' });
 
-    // Security: Only user who marked attendance can update checkout
     if (attendance.userId.toString() !== req.user.userId) {
       return res.status(403).json({ message: 'Unauthorized' });
     }
@@ -128,18 +126,33 @@ exports.getSummary = async (req, res) => {
   try {
     const today = getStartOfDay(new Date());
 
-    const allUsers = await User.find({});
+    const allUsers = await User.find({ role: 'employee' }); // Only employees
     const todayRecords = await Attendance.find({ date: today });
 
-    // Count attendance status types
-    const todayPresent = todayRecords.filter((r) => r.status === 'Present').length;
-    const todayAbsent = todayRecords.filter((r) => r.status === 'Absent').length;
-    const todayHalfDay = todayRecords.filter((r) => r.status === 'Half Day').length;
-    const todayRemote = todayRecords.filter((r) => r.status === 'Remote Work').length;
+    const markedUserIds = new Set(todayRecords.map((r) => r.userId.toString()));
+
+    let todayPresent = 0;
+    let todayAbsentMarked = 0;
+    let todayHalfDay = 0;
+    let todayRemote = 0;
+
+    todayRecords.forEach((r) => {
+      const status = r.status?.toLowerCase();
+      if (status === 'present') todayPresent++;
+      else if (status === 'absent') todayAbsentMarked++;
+      else if (status === 'half day') todayHalfDay++;
+      else if (status === 'remote work') todayRemote++;
+    });
+
+    const trulyAbsent = allUsers.filter(
+      (u) => !markedUserIds.has(u._id.toString())
+    ).length;
+
+    const totalAbsent = todayAbsentMarked + trulyAbsent;
 
     res.json({
       todayPresent,
-      todayAbsent,
+      todayAbsent: totalAbsent,
       todayHalfDay,
       todayRemote,
       totalEmployees: allUsers.length,
