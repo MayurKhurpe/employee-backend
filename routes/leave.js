@@ -26,7 +26,6 @@ router.post('/', protect, async (req, res, next) => {
       ip: req.ip,
     });
 
-    // 📧 Email Admin if they want alerts
     const admins = await User.find({ role: 'admin' });
     for (let admin of admins) {
       const setting = await NotificationSetting.findOne({ userId: admin._id });
@@ -54,8 +53,7 @@ router.put('/admin/approve/:id', protect, isAdmin, async (req, res, next) => {
       ip: req.ip,
     });
 
-    // 📧 Email the employee if they want alerts
-    const leave = res.locals.leave; // Make sure controller sets `res.locals.leave`
+    const leave = res.locals.leave;
     if (leave && leave.userId) {
       const user = await User.findById(leave.userId);
       const setting = await NotificationSetting.findOne({ userId: user._id });
@@ -83,8 +81,7 @@ router.put('/admin/reject/:id', protect, isAdmin, async (req, res, next) => {
       ip: req.ip,
     });
 
-    // 📧 Email the employee if they want alerts
-    const leave = res.locals.leave; // Make sure controller sets `res.locals.leave`
+    const leave = res.locals.leave;
     if (leave && leave.userId) {
       const user = await User.findById(leave.userId);
       const setting = await NotificationSetting.findOne({ userId: user._id });
@@ -102,7 +99,10 @@ router.put('/admin/reject/:id', protect, isAdmin, async (req, res, next) => {
   });
 });
 
-// ✅ View All
+// ✅ View All (Admin)
 router.get('/admin/all', protect, isAdmin, leaveController.getAllLeaves);
+
+// ✅ View Leave History (User)
+router.get('/user', protect, leaveController.getUserLeaves);
 
 module.exports = router;

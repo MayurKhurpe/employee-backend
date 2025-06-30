@@ -154,3 +154,19 @@ exports.getAllLeaves = async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to fetch leaves', error: err.message });
   }
 };
+/**
+ * @desc Get logged-in user's leave history
+ * @route GET /api/leave/user
+ * @access Private (Authenticated user)
+ */
+exports.getUserLeaves = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const leaves = await LeaveRequest.find({ userId }).sort({ createdAt: -1 });
+
+    res.json({ success: true, leaves });
+  } catch (err) {
+    console.error('Error fetching user leaves:', err);
+    res.status(500).json({ success: false, message: 'Failed to fetch user leaves', error: err.message });
+  }
+};
