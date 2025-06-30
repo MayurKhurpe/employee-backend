@@ -107,18 +107,18 @@ exports.approveLeave = async (req, res) => {
  * @access Private (Admin)
  */
 exports.rejectLeave = async (req, res) => {
-  const responseMessage = req.body.responseMessage || req.body.adminNote || 'No reason provided.';
+  const note = req.body.responseMessage || req.body.adminNote || 'No reason provided.';
 
   try {
     const leave = await LeaveRequest.findByIdAndUpdate(
       req.params.id,
-      { status: 'Rejected', responseMessage },
+      { status: 'Rejected', responseMessage: note },
       { new: true }
     );
 
     if (!leave) return res.status(404).json({ success: false, message: 'Leave request not found' });
 
-    // Notify user about rejection
+    // ✅ Use leave.responseMessage saved in DB
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
       to: leave.email,
@@ -127,7 +127,7 @@ exports.rejectLeave = async (req, res) => {
         <h2>Leave Rejected</h2>
         <p>Hello <strong>${leave.name}</strong>,</p>
         <p>Your leave request from <strong>${new Date(leave.startDate).toLocaleDateString()}</strong> to <strong>${new Date(leave.endDate).toLocaleDateString()}</strong> has been <span style="color:red;"><strong>Rejected</strong></span>.</p>
-        <p>Reason Provided: ${responseMessage || 'No reason provided.'}</p>
+        <p>Reason Provided: ${leave.responseMessage || 'No reason provided.'}</p>
         <br/>
         <p>Regards,<br/>Admin Team</p>
       `,
