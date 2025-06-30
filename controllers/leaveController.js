@@ -40,7 +40,7 @@ exports.applyLeave = async (req, res) => {
 
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
-      to: 'admin@yourcompany.com', // optional: update from ENV
+      to: process.env.ADMIN_EMAIL, // optional: update from ENV
       subject: `📩 New Leave Request - ${req.user.name}`,
       html: `
         <h2>New Leave Request</h2>
