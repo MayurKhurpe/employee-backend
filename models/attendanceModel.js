@@ -35,8 +35,12 @@ const attendanceSchema = new mongoose.Schema(
       default: '',
     },
     location: {
-      lat: { type: Number, required: true },
-      lng: { type: Number, required: true },
+      type: {
+        lat: { type: Number, required: true },
+        lng: { type: Number, required: true },
+      },
+      required: false, // you can keep this optional if Remote Work skips it
+      default: null,
     },
   },
   { timestamps: true }
