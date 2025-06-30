@@ -192,7 +192,7 @@ app.post('/api/approve-user', protect, isAdmin, async (req, res) => {
 app.use('/api/profile', protect, require('./routes/profile'));
 app.use('/api/attendance', protect, require('./routes/attendance'));
 app.use('/api/attendance-stats', protect, require('./routes/attendanceStats'));
-app.use('/api/leave', protect, require('./routes/leave'));
+app.use('/api/leave', require('./routes/leave'));
 app.use('/api/birthdays', protect, require('./routes/birthday'));
 app.use('/api/news', protect, require('./routes/news'));
 app.use('/api/holidays', protect, require('./routes/holiday'));
