@@ -1,4 +1,3 @@
-// 📁 middleware/authMiddleware.js
 const jwt = require("jsonwebtoken");
 
 // ✅ Use env or fallback secret

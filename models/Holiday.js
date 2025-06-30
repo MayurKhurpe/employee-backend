@@ -1,4 +1,3 @@
-// 📁 models/Holiday.js
 const mongoose = require('mongoose');
 
 const holidaySchema = new mongoose.Schema(
@@ -30,4 +29,4 @@ const holidaySchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-module.exports = mongoose.model('Holiday', holidaySchema);
+module.exports = mongoose.models.Holiday || mongoose.model('Holiday', holidaySchema);

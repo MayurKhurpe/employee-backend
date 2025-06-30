@@ -1,4 +1,3 @@
-// 📁 backend/models/LeaveRequest.js
 const mongoose = require('mongoose');
 
 const leaveRequestSchema = new mongoose.Schema(
@@ -52,4 +51,4 @@ const leaveRequestSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-module.exports = mongoose.model('LeaveRequest', leaveRequestSchema);
+module.exports = mongoose.models.LeaveRequest || mongoose.model('LeaveRequest', leaveRequestSchema);

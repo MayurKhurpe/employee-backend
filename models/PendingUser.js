@@ -1,4 +1,3 @@
-// 📁 models/PendingUser.js
 const mongoose = require("mongoose");
 
 const pendingUserSchema = new mongoose.Schema({
@@ -13,4 +12,4 @@ const pendingUserSchema = new mongoose.Schema({
   requestedAt: { type: Date, default: Date.now },
 });
 
-module.exports = mongoose.model("PendingUser", pendingUserSchema);
+module.exports = mongoose.models.PendingUser || mongoose.model("PendingUser", pendingUserSchema);

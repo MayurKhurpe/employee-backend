@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const adminController = require('../controllers/adminController');
-const authMiddleware = require('../middleware/auth');
+const { protect } = require('../middleware/auth');
 const isAdmin = require('../middleware/isAdmin');
 
 // ⬇️ Models
@@ -11,7 +11,7 @@ const LeaveRequest = require('../models/LeaveRequest');
 const Attendance = require('../models/Attendance');
 
 // 🔐 Protect all admin routes
-router.use(authMiddleware, isAdmin);
+router.use(protect, isAdmin);
 
 // =========================
 // ✅ USER MANAGEMENT

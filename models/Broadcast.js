@@ -1,5 +1,3 @@
-// 📁 models/Broadcast.js
-
 const mongoose = require('mongoose');
 
 const broadcastSchema = new mongoose.Schema({
@@ -25,4 +23,4 @@ const broadcastSchema = new mongoose.Schema({
   },
 });
 
-module.exports = mongoose.model('Broadcast', broadcastSchema);
+module.exports = mongoose.models.Broadcast || mongoose.model('Broadcast', broadcastSchema);

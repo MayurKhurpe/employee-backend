@@ -1,4 +1,3 @@
-// 📁 models/NotificationSetting.js
 const mongoose = require('mongoose');
 
 const notificationSettingSchema = new mongoose.Schema({
@@ -18,4 +17,4 @@ const notificationSettingSchema = new mongoose.Schema({
   }
 });
 
-module.exports = mongoose.model('NotificationSetting', notificationSettingSchema);
+module.exports = mongoose.models.NotificationSetting || mongoose.model('NotificationSetting', notificationSettingSchema);
