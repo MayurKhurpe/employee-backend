@@ -35,8 +35,8 @@ const attendanceSchema = new mongoose.Schema(
       default: '',
     },
     location: {
-      type: String,
-      default: '',
+      lat: { type: Number, required: true },
+      lng: { type: Number, required: true },
     },
   },
   { timestamps: true }
