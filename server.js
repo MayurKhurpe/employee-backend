@@ -11,13 +11,13 @@ require('dotenv').config();
 
 const { jwtSecret } = require('./config');
 const User = require('./models/User');
-const { protect, isAdmin } = require('./middleware/authMiddleware');
+const { protect, isAdmin } = require('./middleware/auth');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
-// ✅ CORS Setup – with preflight + Vercel support
+// ✅ CORS Setup
 const corsOptions = {
   origin: function (origin, callback) {
     const allowedOrigins = [
@@ -38,14 +38,14 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions)); // handle preflight
+app.options('*', cors(corsOptions));
 
 // ✅ Middleware
 app.use(express.json());
 app.use(helmet());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// ✅ MongoDB Connection
+// ✅ MongoDB
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('✅ MongoDB connected'))
   .catch(err => console.error('❌ MongoDB error:', err));
@@ -83,7 +83,7 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// 🔐 Register - Simple
+// 🔐 Simple Register
 app.post('/api/register', async (req, res) => {
   const { name, email, password } = req.body;
   try {
@@ -100,7 +100,7 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-// 🔐 Register - With Full Fields
+// 🔐 Full Registration
 app.post('/api/register-request', async (req, res) => {
   const { name, email, password, mobile, department, address, profileImage } = req.body;
   if (!name || !email || !password || !mobile || !department) {
@@ -176,7 +176,7 @@ app.post('/api/reset-password/:token', async (req, res) => {
   res.json({ message: 'Password reset successful' });
 });
 
-// ✅ Admin Approval
+// ✅ Admin Approves Users
 app.post('/api/approve-user', protect, isAdmin, async (req, res) => {
   const { email } = req.body;
   try {
@@ -188,19 +188,27 @@ app.post('/api/approve-user', protect, isAdmin, async (req, res) => {
   }
 });
 
-// ✅ Feature Routes
+// ✅ Routes
 app.use('/api/profile', protect, require('./routes/profile'));
 app.use('/api/attendance', protect, require('./routes/attendance'));
 app.use('/api/attendance-stats', protect, require('./routes/attendanceStats'));
-app.use('/api/leave', require('./routes/leave'));
+app.use('/api/leave', protect, require('./routes/leave'));
 app.use('/api/birthdays', protect, require('./routes/birthday'));
 app.use('/api/news', protect, require('./routes/news'));
+
+// ✅ Fix: Holidays route (use normal path, not /admin/holidays)
 app.use('/api/holidays', protect, require('./routes/holiday'));
+
+// ✅ Broadcasts remain under admin
 app.use('/api/admin/broadcasts', require('./routes/broadcast'));
+
+// ✅ Notification Settings
 app.use('/api/notification-settings', protect, require('./routes/notification'));
+
+// ✅ Admin-only zone
 app.use('/api/admin', protect, isAdmin, require('./routes/admin'));
 
-// ⏰ Daily Scheduler
+// ⏰ Daily Background Jobs
 require('./scheduler');
 
 // 🚀 Start Server
