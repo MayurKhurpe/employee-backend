@@ -107,7 +107,7 @@ exports.approveLeave = async (req, res) => {
  * @access Private (Admin)
  */
 exports.rejectLeave = async (req, res) => {
-  const { responseMessage } = req.body;
+  const responseMessage = req.body.responseMessage || req.body.adminNote || 'No reason provided.';
 
   try {
     const leave = await LeaveRequest.findByIdAndUpdate(
