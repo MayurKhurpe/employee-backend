@@ -10,7 +10,7 @@ router.post('/', protect, async (req, res) => {
   const { currentPassword, newPassword } = req.body;
 
   try {
-    const user = await User.findById(req.user.id);
+    const user = await User.findById(req.user.userId); // ✅ FIXED HERE
     if (!user) return res.status(404).json({ error: 'User not found' });
 
     const isMatch = await bcrypt.compare(currentPassword, user.password);
