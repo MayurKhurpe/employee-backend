@@ -25,7 +25,7 @@ exports.markAttendance = async (req, res) => {
     const userId = req.user.userId;
     const {
       status = 'Present',
-      location = {},
+      location = null,
       checkInTime,
       customer,
       workLocation,
@@ -42,7 +42,6 @@ exports.markAttendance = async (req, res) => {
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    // ✅ Create new attendance
     const newAttendance = new Attendance({
       userId,
       name: user.name,
@@ -52,7 +51,7 @@ exports.markAttendance = async (req, res) => {
       checkInTime,
     });
 
-    // ✅ Handle Remote Work
+    // ✅ For Remote Work: Validate required fields, no location needed
     if (status === 'Remote Work') {
       if (!customer || !workLocation || !assignedBy) {
         return res.status(400).json({ message: 'All remote work fields are required.' });
@@ -60,18 +59,20 @@ exports.markAttendance = async (req, res) => {
       newAttendance.customer = customer;
       newAttendance.workLocation = workLocation;
       newAttendance.assignedBy = assignedBy;
-    } else {
-      // ✅ For non-remote statuses, store location if it's valid
+    }
+
+    // ✅ For Office statuses, location is mandatory
+    if (['Present', 'Absent', 'Half Day'].includes(status)) {
       if (typeof location === 'object' && location.lat && location.lng) {
         newAttendance.location = `${location.lat},${location.lng}`;
-      } else if (typeof location === 'string') {
-        newAttendance.location = location;
+      } else {
+        return res.status(400).json({ message: 'Location (lat,lng) is required for this status.' });
       }
     }
 
     await newAttendance.save();
 
-    // ✅ Send email if absent
+    // 📧 Optional Email on Absent
     if (status === 'Absent') {
       await transporter.sendMail({
         from: process.env.EMAIL_USER,
