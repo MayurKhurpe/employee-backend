@@ -34,14 +34,15 @@ exports.updateProfile = async (req, res) => {
     emergencyMobile,
     bloodGroup,
     department,
-    joiningDate
+    joiningDate,
+    dob // ✅ New field for birthday
   } = req.body;
 
   try {
     const user = await User.findById(req.user.userId);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    // Optional: Prevent email change unless explicitly intended
+    // ✅ Email update with duplicate check
     if (email && email !== user.email) {
       const emailExists = await User.findOne({ email });
       if (emailExists) {
@@ -50,6 +51,7 @@ exports.updateProfile = async (req, res) => {
       user.email = email;
     }
 
+    // ✅ Update profile fields
     user.name = name || user.name;
     user.address = address || user.address;
     user.mobile = mobile || user.mobile;
@@ -57,11 +59,11 @@ exports.updateProfile = async (req, res) => {
     user.bloodGroup = bloodGroup || user.bloodGroup;
     user.department = department || user.department;
     user.joiningDate = joiningDate || user.joiningDate;
+    user.dob = dob || user.dob; // ✅ Save dob
 
     await user.save();
 
     const updatedUser = await User.findById(user._id).select('-password');
-
     res.status(200).json({ message: 'Profile updated successfully', user: updatedUser });
   } catch (err) {
     console.error('❌ Error updating profile:', err);
