@@ -34,7 +34,6 @@ exports.markAttendance = async (req, res) => {
 
     const today = getStartOfDay(new Date());
 
-    // ❌ Prevent duplicate entry
     if (await Attendance.findOne({ userId, date: today })) {
       return res.status(400).json({ message: 'Attendance already marked for today.' });
     }
@@ -51,7 +50,6 @@ exports.markAttendance = async (req, res) => {
       checkInTime,
     });
 
-    // ✅ For Remote Work: Validate required fields, no location needed
     if (status === 'Remote Work') {
       if (!customer || !workLocation || !assignedBy) {
         return res.status(400).json({ message: 'All remote work fields are required.' });
@@ -61,7 +59,6 @@ exports.markAttendance = async (req, res) => {
       newAttendance.assignedBy = assignedBy;
     }
 
-    // ✅ For Office statuses, location is mandatory
     if (['Present', 'Absent', 'Half Day'].includes(status)) {
       if (typeof location === 'object' && location.lat && location.lng) {
         newAttendance.location = `${location.lat},${location.lng}`;
@@ -72,7 +69,6 @@ exports.markAttendance = async (req, res) => {
 
     await newAttendance.save();
 
-    // 📧 Optional Email on Absent
     if (status === 'Absent') {
       await transporter.sendMail({
         from: process.env.EMAIL_USER,
@@ -108,15 +104,26 @@ exports.getMyAttendance = async (req, res) => {
   }
 };
 
-// ✅ Get All Attendance (Admin)
+// ✅ Updated: Get All Attendance (Admin) with ?date & pagination
 exports.getAllAttendance = async (req, res) => {
   try {
-    const records = await Attendance.find()
-      .populate('userId', 'name email')
-      .sort({ date: -1 });
-    res.json(records);
+    const { page = 1, limit = 10, date } = req.query;
+    const queryDate = date ? getStartOfDay(new Date(date)) : getStartOfDay(new Date());
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const totalRecords = await Attendance.countDocuments({ date: queryDate });
+
+    const records = await Attendance.find({ date: queryDate })
+      .sort({ checkInTime: 1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    res.json({
+      records,
+      totalPages: Math.ceil(totalRecords / limit),
+    });
   } catch (err) {
-    res.status(500).json({ message: 'Error fetching all attendance.', error: err.message });
+    res.status(500).json({ message: 'Error fetching attendance.', error: err.message });
   }
 };
 
@@ -150,13 +157,13 @@ exports.updateCheckout = async (req, res) => {
   }
 };
 
-// ✅ Admin: Summary Stats for Today
+// ✅ Updated: Admin Summary with ?date support
 exports.getSummary = async (req, res) => {
   try {
-    const today = getStartOfDay(new Date());
+    const queryDate = req.query.date ? getStartOfDay(new Date(req.query.date)) : getStartOfDay(new Date());
 
     const allUsers = await User.find({ role: 'employee' });
-    const todayRecords = await Attendance.find({ date: today });
+    const todayRecords = await Attendance.find({ date: queryDate });
 
     const markedUserIds = new Set(todayRecords.map((r) => r.userId.toString()));
 
@@ -191,7 +198,7 @@ exports.getSummary = async (req, res) => {
   }
 };
 
-// ✅ NEW: Get My Summary (for dashboard)
+// ✅ My Summary (for dashboard widget)
 exports.getMySummary = async (req, res) => {
   try {
     const userId = req.user.userId;
