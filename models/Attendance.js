@@ -47,6 +47,6 @@ const attendanceSchema = new mongoose.Schema({
 });
 
 // ✅ Fix OverwriteModelError by checking if model already exists
-const Attendance = mongoose.models.Attendance || mongoose.model('Attendance', attendanceSchema);
+const Attendance = mongoose.model('Attendance', attendanceSchema);
 
 module.exports = Attendance;
