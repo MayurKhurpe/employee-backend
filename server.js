@@ -1,5 +1,3 @@
-// ✅ FULL BACKEND FINAL CODE with Event Routes Connected
-
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
@@ -201,9 +199,10 @@ app.use('/api/holidays', protect, require('./routes/holiday'));
 app.use('/api/admin/broadcasts', require('./routes/broadcast'));
 app.use('/api/notification-settings', protect, require('./routes/notification'));
 app.use('/api/admin', protect, isAdmin, require('./routes/admin'));
-
-// ✅ ✅ ✅ ✅ NEW: Events Route Connected
 app.use('/api/events', protect, require('./routes/eventRoutes'));
+
+// ✅ ✅ ✅ ✅ NEW: Change Password Route Added
+app.use('/api/change-password', protect, require('./routes/changePassword'));
 
 // ⏰ Daily Background Jobs
 require('./scheduler');
