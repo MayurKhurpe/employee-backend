@@ -12,7 +12,7 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// Helper to get start-of-day
+// Helper to get start-of-day (00:00:00)
 const getStartOfDay = (date) => {
   const d = new Date(date);
   d.setHours(0, 0, 0, 0);
@@ -104,23 +104,55 @@ exports.getMyAttendance = async (req, res) => {
   }
 };
 
-// ✅ Updated: Get All Attendance (Admin) with ?date & pagination
+// ✅ FINAL: Get All Attendance (Admin) with Unmarked Users + Pagination
 exports.getAllAttendance = async (req, res) => {
   try {
     const { page = 1, limit = 10, date } = req.query;
     const queryDate = date ? getStartOfDay(new Date(date)) : getStartOfDay(new Date());
-    const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    const totalRecords = await Attendance.countDocuments({ date: queryDate });
+    // Get all employees
+    const users = await User.find({ role: 'employee' }).select('_id name email');
 
-    const records = await Attendance.find({ date: queryDate })
-      .sort({ checkInTime: 1 })
-      .skip(skip)
-      .limit(parseInt(limit));
+    // Get attendance records for the date
+    const markedRecords = await Attendance.find({ date: queryDate });
+
+    // Map userId => attendance record
+    const attendanceMap = new Map();
+    markedRecords.forEach((rec) => {
+      attendanceMap.set(rec.userId.toString(), rec);
+    });
+
+    // Merge attendance with users, add placeholder for unmarked
+    const fullRecords = users.map((user) => {
+      const rec = attendanceMap.get(user._id.toString());
+      if (rec) return rec;
+      return {
+        _id: 'not-marked-' + user._id,
+        userId: user._id,
+        name: user.name,
+        email: user.email,
+        date: queryDate,
+        status: 'Not Marked Yet',
+        checkInTime: null,
+        checkOutTime: null,
+        location: '—',
+        customer: '—',
+        workLocation: '—',
+        assignedBy: '—',
+      };
+    });
+
+    // Sort by name alphabetically
+    const sorted = fullRecords.sort((a, b) => a.name.localeCompare(b.name));
+
+    // Pagination logic
+    const start = (page - 1) * limit;
+    const paginated = sorted.slice(start, start + Number(limit));
+    const totalPages = Math.ceil(fullRecords.length / limit);
 
     res.json({
-      records,
-      totalPages: Math.ceil(totalRecords / limit),
+      records: paginated,
+      totalPages,
     });
   } catch (err) {
     res.status(500).json({ message: 'Error fetching attendance.', error: err.message });
