@@ -1,3 +1,5 @@
+// ✅ FULL BACKEND FINAL CODE with Event Routes Connected
+
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
@@ -195,18 +197,13 @@ app.use('/api/attendance-stats', protect, require('./routes/attendanceStats'));
 app.use('/api/leave', protect, require('./routes/leave'));
 app.use('/api/birthdays', protect, require('./routes/birthday'));
 app.use('/api/news', protect, require('./routes/news'));
-
-// ✅ Fix: Holidays route (use normal path, not /admin/holidays)
 app.use('/api/holidays', protect, require('./routes/holiday'));
-
-// ✅ Broadcasts remain under admin
 app.use('/api/admin/broadcasts', require('./routes/broadcast'));
-
-// ✅ Notification Settings
 app.use('/api/notification-settings', protect, require('./routes/notification'));
-
-// ✅ Admin-only zone
 app.use('/api/admin', protect, isAdmin, require('./routes/admin'));
+
+// ✅ ✅ ✅ ✅ NEW: Events Route Connected
+app.use('/api/events', protect, require('./routes/eventRoutes'));
 
 // ⏰ Daily Background Jobs
 require('./scheduler');
