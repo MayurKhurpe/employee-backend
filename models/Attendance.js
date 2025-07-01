@@ -1,4 +1,3 @@
-// 📁 models/Attendance.js
 const mongoose = require('mongoose');
 
 const attendanceSchema = new mongoose.Schema({
@@ -9,30 +8,38 @@ const attendanceSchema = new mongoose.Schema({
   },
   name: {
     type: String,
+    required: true,
+    trim: true,
   },
   email: {
     type: String,
+    required: true,
+    lowercase: true,
   },
   date: {
-    type: Date, // ✅ Use Date type for proper querying
+    type: Date,
     required: true,
   },
   status: {
-    type: String, // Present, Absent, Leave, Half Day, Remote Work etc.
-    required: true,
-  },
-  location: {
-    type: String, // Office, Remote, etc.
-    default: 'Office',
+    type: String,
+    enum: ['Present', 'Absent', 'Leave', 'Half Day', 'Remote Work'],
+    default: 'Present',
   },
   checkInTime: {
     type: String,
+    default: '',
   },
   checkOutTime: {
     type: String,
+    default: '',
   },
-
-  // ✅ Remote Work Extra Fields
+  location: {
+    type: {
+      lat: { type: Number },
+      lng: { type: Number },
+    },
+    default: null,
+  },
   customer: {
     type: String,
   },
@@ -42,11 +49,7 @@ const attendanceSchema = new mongoose.Schema({
   assignedBy: {
     type: String,
   },
-}, {
-  timestamps: true,
-});
+}, { timestamps: true });
 
-// ✅ Fix OverwriteModelError by checking if model already exists
-const Attendance = mongoose.model('Attendance', attendanceSchema);
-
-module.exports = Attendance;
+// ✅ Prevent OverwriteModelError
+module.exports = mongoose.models.Attendance || mongoose.model('Attendance', attendanceSchema);
