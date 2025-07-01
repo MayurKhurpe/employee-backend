@@ -34,6 +34,7 @@ exports.markAttendance = async (req, res) => {
 
     const today = getStartOfDay(new Date());
 
+    // ❌ Prevent duplicate entry
     if (await Attendance.findOne({ userId, date: today })) {
       return res.status(400).json({ message: 'Attendance already marked for today.' });
     }
@@ -41,21 +42,17 @@ exports.markAttendance = async (req, res) => {
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
+    // ✅ Create new attendance
     const newAttendance = new Attendance({
       userId,
       name: user.name,
       email: user.email,
       date: today,
       status,
-      location:
-  typeof location === 'object' && location.lat && location.lng
-    ? `${location.lat},${location.lng}`
-    : typeof location === 'string'
-    ? location
-    : 'Unknown',
       checkInTime,
     });
 
+    // ✅ Handle Remote Work
     if (status === 'Remote Work') {
       if (!customer || !workLocation || !assignedBy) {
         return res.status(400).json({ message: 'All remote work fields are required.' });
@@ -63,10 +60,18 @@ exports.markAttendance = async (req, res) => {
       newAttendance.customer = customer;
       newAttendance.workLocation = workLocation;
       newAttendance.assignedBy = assignedBy;
+    } else {
+      // ✅ For non-remote statuses, store location if it's valid
+      if (typeof location === 'object' && location.lat && location.lng) {
+        newAttendance.location = `${location.lat},${location.lng}`;
+      } else if (typeof location === 'string') {
+        newAttendance.location = location;
+      }
     }
 
     await newAttendance.save();
 
+    // ✅ Send email if absent
     if (status === 'Absent') {
       await transporter.sendMail({
         from: process.env.EMAIL_USER,
@@ -80,8 +85,10 @@ exports.markAttendance = async (req, res) => {
       });
     }
 
-    const attendanceObj = newAttendance.toObject();
-    res.status(201).json({ message: 'Attendance marked successfully.', attendance: attendanceObj });
+    res.status(201).json({
+      message: 'Attendance marked successfully.',
+      attendance: newAttendance.toObject(),
+    });
 
   } catch (err) {
     console.error('❌ Attendance Marking Failed:', err);
