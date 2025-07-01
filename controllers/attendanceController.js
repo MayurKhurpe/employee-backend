@@ -47,7 +47,12 @@ exports.markAttendance = async (req, res) => {
       email: user.email,
       date: today,
       status,
-      location: typeof location === 'string' ? location : `${location.lat},${location.lng}`,
+      location:
+  typeof location === 'object' && location.lat && location.lng
+    ? `${location.lat},${location.lng}`
+    : typeof location === 'string'
+    ? location
+    : 'Unknown',
       checkInTime,
     });
 
