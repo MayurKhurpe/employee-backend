@@ -18,7 +18,7 @@ const attendanceSchema = new mongoose.Schema({
     required: true,
   },
   status: {
-    type: String, // Present, Absent, Leave, Half Day, etc.
+    type: String, // Present, Absent, Leave, Half Day, Remote Work etc.
     required: true,
   },
   location: {
@@ -29,6 +29,17 @@ const attendanceSchema = new mongoose.Schema({
     type: String,
   },
   checkOutTime: {
+    type: String,
+  },
+
+  // ✅ Remote Work Extra Fields
+  customer: {
+    type: String,
+  },
+  workLocation: {
+    type: String,
+  },
+  assignedBy: {
     type: String,
   },
 }, {

@@ -1,10 +1,9 @@
-// 📁 controllers/attendanceController.js
 const Attendance = require('../models/attendanceModel');
 const User = require('../models/User');
 const nodemailer = require('nodemailer');
 require('dotenv').config();
 
-// Setup email transporter
+// Email transporter setup
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
@@ -13,22 +12,29 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// Helper: get start of day for date comparisons (UTC midnight)
+// Helper to get start-of-day
 const getStartOfDay = (date) => {
   const d = new Date(date);
   d.setHours(0, 0, 0, 0);
   return d;
 };
 
-// ✅ Mark Today's Attendance
+// ✅ Mark Attendance
 exports.markAttendance = async (req, res) => {
   try {
     const userId = req.user.userId;
-    const { status = 'Present', location, checkInTime } = req.body;
+    const {
+      status = 'Present',
+      location = {},
+      checkInTime,
+      customer,
+      workLocation,
+      assignedBy,
+    } = req.body;
+
     const today = getStartOfDay(new Date());
 
-    const alreadyMarked = await Attendance.findOne({ userId, date: today });
-    if (alreadyMarked) {
+    if (await Attendance.findOne({ userId, date: today })) {
       return res.status(400).json({ message: 'Attendance already marked for today.' });
     }
 
@@ -41,13 +47,21 @@ exports.markAttendance = async (req, res) => {
       email: user.email,
       date: today,
       status,
-      location,
+      location: typeof location === 'string' ? location : `${location.lat},${location.lng}`,
       checkInTime,
     });
 
+    if (status === 'Remote Work') {
+      if (!customer || !workLocation || !assignedBy) {
+        return res.status(400).json({ message: 'All remote work fields are required.' });
+      }
+      newAttendance.customer = customer;
+      newAttendance.workLocation = workLocation;
+      newAttendance.assignedBy = assignedBy;
+    }
+
     await newAttendance.save();
 
-    // 📧 Email alert if Absent
     if (status === 'Absent') {
       await transporter.sendMail({
         from: process.env.EMAIL_USER,
@@ -61,14 +75,16 @@ exports.markAttendance = async (req, res) => {
       });
     }
 
-    res.status(201).json({ message: 'Attendance marked successfully.', attendance: newAttendance });
+    const attendanceObj = newAttendance.toObject();
+    res.status(201).json({ message: 'Attendance marked successfully.', attendance: attendanceObj });
+
   } catch (err) {
     console.error('❌ Attendance Marking Failed:', err);
     res.status(500).json({ message: 'Error marking attendance.', error: err.message });
   }
 };
 
-// ✅ Get Logged In User's Attendance
+// ✅ Get My Attendance Records
 exports.getMyAttendance = async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -79,7 +95,7 @@ exports.getMyAttendance = async (req, res) => {
   }
 };
 
-// ✅ Admin: Get All Attendance
+// ✅ Get All Attendance (Admin)
 exports.getAllAttendance = async (req, res) => {
   try {
     const records = await Attendance.find()
@@ -91,7 +107,7 @@ exports.getAllAttendance = async (req, res) => {
   }
 };
 
-// ✅ Admin: Get Specific User Attendance
+// ✅ Get Specific User Attendance (Admin)
 exports.getUserAttendance = async (req, res) => {
   try {
     const records = await Attendance.find({ userId: req.params.userId }).sort({ date: -1 });
@@ -101,7 +117,7 @@ exports.getUserAttendance = async (req, res) => {
   }
 };
 
-// ✅ Update Check-Out Time
+// ✅ Update Checkout Time
 exports.updateCheckout = async (req, res) => {
   try {
     const { checkOutTime } = req.body;
@@ -126,7 +142,7 @@ exports.getSummary = async (req, res) => {
   try {
     const today = getStartOfDay(new Date());
 
-    const allUsers = await User.find({ role: 'employee' }); // Only employees
+    const allUsers = await User.find({ role: 'employee' });
     const todayRecords = await Attendance.find({ date: today });
 
     const markedUserIds = new Set(todayRecords.map((r) => r.userId.toString()));
@@ -156,6 +172,38 @@ exports.getSummary = async (req, res) => {
       todayHalfDay,
       todayRemote,
       totalEmployees: allUsers.length,
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Error fetching summary.', error: err.message });
+  }
+};
+
+// ✅ NEW: Get My Summary (for dashboard)
+exports.getMySummary = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    const records = await Attendance.find({ userId });
+
+    let present = 0;
+    let absent = 0;
+    let halfDay = 0;
+    let remoteWork = 0;
+
+    records.forEach((r) => {
+      const status = r.status?.toLowerCase();
+      if (status === 'present') present++;
+      else if (status === 'absent') absent++;
+      else if (status === 'half day') halfDay++;
+      else if (status === 'remote work') remoteWork++;
+    });
+
+    res.json({
+      present,
+      absent,
+      halfDay,
+      remoteWork,
+      totalDays: records.length,
     });
   } catch (err) {
     res.status(500).json({ message: 'Error fetching summary.', error: err.message });
