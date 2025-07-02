@@ -59,12 +59,19 @@ exports.markAttendance = async (req, res) => {
     }
 
     if (['Present', 'Absent', 'Half Day'].includes(status)) {
-      if (typeof location === 'object' && location.lat && location.lng) {
-        newAttendance.location = `${location.lat},${location.lng}`;
-      } else {
-        return res.status(400).json({ message: 'Location (lat,lng) is required for this status.' });
-      }
-    }
+  if (
+    typeof location === 'object' &&
+    typeof location.lat === 'number' &&
+    typeof location.lng === 'number'
+  ) {
+    newAttendance.location = {
+      lat: location.lat,
+      lng: location.lng,
+    };
+  } else {
+    return res.status(400).json({ message: 'Location (lat,lng) is required and must be numbers.' });
+  }
+}
 
     await newAttendance.save();
 
