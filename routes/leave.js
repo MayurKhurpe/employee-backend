@@ -11,30 +11,29 @@ router.post('/', protect, leaveController.applyLeave);
 // ✅ Get logged-in user's leave history
 router.get('/user', protect, leaveController.getUserLeaves);
 
-// ✅ Get all leaves (Admin with filters)
+// ✅ Get all leaves (Admin with filters: by user + month)
 router.get('/admin/all', protect, isAdmin, async (req, res) => {
   try {
     const { userId, month } = req.query;
     const query = {};
 
-    // 🎯 Filter by user
+    // 🔍 Filter by user
     if (userId) {
-      query.user = userId;
+      query.userId = userId; // ✅ Correct field
     }
 
-    // 📆 Filter by month (YYYY-MM format)
+    // 📆 Filter by month (YYYY-MM)
     if (month) {
       const startOfMonth = new Date(`${month}-01`);
       const endOfMonth = new Date(startOfMonth);
-      endOfMonth.setMonth(endOfMonth.getMonth() + 1);
+      endOfMonth.setMonth(endOfMonth.getMonth() + 1); // Next month
       query.startDate = { $gte: startOfMonth, $lt: endOfMonth };
     }
 
     const leaves = await LeaveRequest.find(query)
-      .populate('user', 'name email') // to get user info
+      .populate('userId', 'name email') // ✅ Populate correct reference
       .sort({ createdAt: -1 });
 
-    // 🛠️ Format response to match frontend expectations
     const formattedLeaves = leaves.map((leave) => ({
       _id: leave._id,
       startDate: leave.startDate,
@@ -42,13 +41,13 @@ router.get('/admin/all', protect, isAdmin, async (req, res) => {
       reason: leave.reason,
       status: leave.status,
       adminNote: leave.adminNote,
-      name: leave.user?.name || '',
-      email: leave.user?.email || '',
+      name: leave.userId?.name || '',
+      email: leave.userId?.email || '',
     }));
 
     res.json({ leaves: formattedLeaves });
   } catch (err) {
-    console.error('Error fetching admin leaves:', err);
+    console.error('🔥 Error fetching admin leaves:', err);
     res.status(500).json({ error: 'Failed to fetch leave requests' });
   }
 });
@@ -71,7 +70,7 @@ router.put('/admin/approve/:id', protect, isAdmin, async (req, res) => {
 
     res.json({ message: 'Leave approved successfully' });
   } catch (err) {
-    console.error('Error approving leave:', err);
+    console.error('🔥 Error approving leave:', err);
     res.status(500).json({ error: 'Failed to approve leave' });
   }
 });
@@ -94,7 +93,7 @@ router.put('/admin/reject/:id', protect, isAdmin, async (req, res) => {
 
     res.json({ message: 'Leave rejected successfully' });
   } catch (err) {
-    console.error('Error rejecting leave:', err);
+    console.error('🔥 Error rejecting leave:', err);
     res.status(500).json({ error: 'Failed to reject leave' });
   }
 });

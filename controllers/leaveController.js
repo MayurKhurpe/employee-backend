@@ -25,7 +25,7 @@ exports.applyLeave = async (req, res) => {
 
   try {
     const leave = new LeaveRequest({
-      userId: req.user.userId,
+      userId: req.user.userId, // 🔑 for population
       name: req.user.name,
       email: req.user.email,
       leaveType,
@@ -37,6 +37,7 @@ exports.applyLeave = async (req, res) => {
 
     await leave.save();
 
+    // ✉️ Email to Admin
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
       to: process.env.ADMIN_EMAIL,
@@ -71,21 +72,6 @@ exports.getUserLeaves = async (req, res) => {
   } catch (err) {
     console.error('❌ Error fetching user leaves:', err);
     res.status(500).json({ success: false, message: 'Failed to fetch user leaves' });
-  }
-};
-
-/**
- * @desc Get all leave requests (Admin)
- * @route GET /api/leave
- * @access Admin
- */
-exports.getAllLeaves = async (req, res) => {
-  try {
-    const leaves = await LeaveRequest.find().sort({ createdAt: -1 });
-    res.json(leaves);
-  } catch (err) {
-    console.error('❌ Error fetching leaves:', err);
-    res.status(500).json({ success: false, message: 'Failed to fetch leaves' });
   }
 };
 
