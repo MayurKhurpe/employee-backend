@@ -1,4 +1,3 @@
-// 📁 controllers/leaveController.js
 const LeaveRequest = require('../models/LeaveRequest');
 const nodemailer = require('nodemailer');
 require('dotenv').config();
@@ -40,7 +39,7 @@ exports.applyLeave = async (req, res) => {
 
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
-      to: process.env.ADMIN_EMAIL, // optional: update from ENV
+      to: process.env.ADMIN_EMAIL,
       subject: `📩 New Leave Request - ${req.user.name}`,
       html: `
         <h2>New Leave Request</h2>
@@ -53,7 +52,7 @@ exports.applyLeave = async (req, res) => {
       `,
     });
 
-    res.status(201).json(leave); // ✅ Frontend expects plain object
+    res.status(201).json(leave);
   } catch (err) {
     console.error('❌ Error applying leave:', err);
     res.status(500).json({ success: false, message: 'Error applying leave', error: err.message });
@@ -68,8 +67,7 @@ exports.applyLeave = async (req, res) => {
 exports.getUserLeaves = async (req, res) => {
   try {
     const leaves = await LeaveRequest.find({ userId: req.user.userId }).sort({ createdAt: -1 });
-
-    res.json(leaves); // ✅ Frontend expects array directly
+    res.json(leaves);
   } catch (err) {
     console.error('❌ Error fetching user leaves:', err);
     res.status(500).json({ success: false, message: 'Failed to fetch user leaves' });
@@ -84,7 +82,7 @@ exports.getUserLeaves = async (req, res) => {
 exports.getAllLeaves = async (req, res) => {
   try {
     const leaves = await LeaveRequest.find().sort({ createdAt: -1 });
-    res.json(leaves); // ✅ Same structure
+    res.json(leaves);
   } catch (err) {
     console.error('❌ Error fetching leaves:', err);
     res.status(500).json({ success: false, message: 'Failed to fetch leaves' });
@@ -97,10 +95,11 @@ exports.getAllLeaves = async (req, res) => {
  * @access Admin
  */
 exports.approveLeave = async (req, res) => {
+  const note = req.body.responseMessage || 'Approved by admin';
   try {
     const leave = await LeaveRequest.findByIdAndUpdate(
       req.params.id,
-      { status: 'Approved' },
+      { status: 'Approved', adminNote: note },
       { new: true }
     );
 
@@ -115,6 +114,7 @@ exports.approveLeave = async (req, res) => {
         <p>Hello <strong>${leave.name}</strong>,</p>
         <p>Your leave from <strong>${new Date(leave.startDate).toLocaleDateString()}</strong> to <strong>${new Date(leave.endDate).toLocaleDateString()}</strong> has been <span style="color:green;"><strong>Approved</strong></span>.</p>
         <p>Type: ${leave.leaveType}</p>
+        <p>Admin Note: ${note}</p>
         <p>Regards,<br/>Admin Team</p>
       `,
     });
@@ -132,12 +132,11 @@ exports.approveLeave = async (req, res) => {
  * @access Admin
  */
 exports.rejectLeave = async (req, res) => {
-  const reason = req.body.responseMessage || req.body.adminNote || 'No reason provided';
-
+  const note = req.body.responseMessage || 'Rejected by admin';
   try {
     const leave = await LeaveRequest.findByIdAndUpdate(
       req.params.id,
-      { status: 'Rejected', responseMessage: reason },
+      { status: 'Rejected', adminNote: note },
       { new: true }
     );
 
@@ -151,7 +150,7 @@ exports.rejectLeave = async (req, res) => {
         <h2>Leave Rejected</h2>
         <p>Hello <strong>${leave.name}</strong>,</p>
         <p>Your leave from <strong>${new Date(leave.startDate).toLocaleDateString()}</strong> to <strong>${new Date(leave.endDate).toLocaleDateString()}</strong> has been <span style="color:red;"><strong>Rejected</strong></span>.</p>
-        <p>Reason: ${leave.responseMessage}</p>
+        <p>Reason: ${note}</p>
         <p>Regards,<br/>Admin Team</p>
       `,
     });
