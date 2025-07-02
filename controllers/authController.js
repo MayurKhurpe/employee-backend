@@ -8,7 +8,7 @@ const nodemailer = require('nodemailer');
 const { jwtSecret, frontendURL } = require('../config');
 require('dotenv').config();
 
-// Create reusable nodemailer transporter
+// ✅ Nodemailer Transporter
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
@@ -17,53 +17,30 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-/**
- * @desc Register a new user and send email verification link
- */
+// 📩 Register
 exports.register = async (req, res) => {
   try {
     const { name, email: rawEmail, password } = req.body;
-
     if (!name || !rawEmail || !password) {
       return res.status(400).json({ error: 'Name, email, and password are required' });
     }
 
     const email = rawEmail.toLowerCase();
-
-    // Check if user exists
     const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ error: 'User already exists with this email' });
-    }
+    if (existingUser) return res.status(400).json({ error: 'User already exists' });
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Generate email verification token
     const verificationToken = crypto.randomBytes(32).toString('hex');
 
-    // Create user but mark unverified
-    const newUser = new User({
-      name,
-      email,
-      password: hashedPassword,
-      verificationToken,
-      isVerified: false,
-    });
+    const newUser = new User({ name, email, password: hashedPassword, verificationToken, isVerified: false });
     await newUser.save();
 
-    // Send verification email
     const verifyLink = `${frontendURL.replace(/\/$/, '')}/verify-email/${verificationToken}`;
     await transporter.sendMail({
       from: `"MES HR" <${process.env.EMAIL_USER}>`,
       to: email,
       subject: '✅ Verify Your Email - MES HR Portal',
-      html: `
-        <h2>Hello ${name},</h2>
-        <p>Thank you for registering. Please verify your email address by clicking the link below:</p>
-        <a href="${verifyLink}">👉 Verify Email</a>
-        <p>If you did not request this, please ignore this email.</p>
-      `,
+      html: `<p>Hello ${name},</p><p>Please verify your email: <a href="${verifyLink}">Verify Email</a></p>`,
     });
 
     res.status(201).json({ message: 'Registration successful. Please verify your email.' });
@@ -73,59 +50,40 @@ exports.register = async (req, res) => {
   }
 };
 
-/**
- * @desc Verify email using token
- */
+// ✅ Email Verification
 exports.verifyEmail = async (req, res) => {
   try {
     const { token } = req.params;
-
     const user = await User.findOne({ verificationToken: token });
-    if (!user) {
-      return res.status(400).json({ error: 'Invalid or expired verification token' });
-    }
+
+    if (!user) return res.status(400).json({ error: 'Invalid or expired verification token' });
 
     user.isVerified = true;
-    user.verificationToken = undefined; // clear token
+    user.verificationToken = undefined;
     await user.save();
 
-    res.json({ message: 'Email verified successfully! You can now log in.' });
+    res.json({ message: 'Email verified successfully!' });
   } catch (err) {
     console.error('Verify email error:', err);
-    res.status(500).json({ error: 'Server error during email verification' });
+    res.status(500).json({ error: 'Server error verifying email' });
   }
 };
 
-/**
- * @desc Login user and return JWT token
- */
+// ✅ Login
 exports.login = async (req, res) => {
   try {
     const { email: rawEmail, password } = req.body;
-
-    if (!rawEmail || !password) {
-      return res.status(400).json({ error: 'Email and password are required' });
-    }
+    if (!rawEmail || !password) return res.status(400).json({ error: 'Email and password required' });
 
     const email = rawEmail.toLowerCase();
-
     const user = await User.findOne({ email });
-    if (!user) {
+    if (!user || !(await bcrypt.compare(password, user.password))) {
       return res.status(400).json({ error: 'Invalid email or password' });
     }
 
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(400).json({ error: 'Invalid email or password' });
-    }
+    if (!user.isVerified) return res.status(403).json({ error: 'Please verify your email first' });
 
-    if (!user.isVerified) {
-      return res.status(403).json({ error: 'Please verify your email before logging in' });
-    }
-
-    const token = jwt.sign({ id: user._id, role: user.role }, jwtSecret, {
-      expiresIn: '2h',
-    });
+    const token = jwt.sign({ id: user._id, role: user.role }, jwtSecret, { expiresIn: '2h' });
 
     res.json({
       token,
@@ -142,116 +100,110 @@ exports.login = async (req, res) => {
   }
 };
 
-/**
- * @desc Change password for logged-in user
- */
-exports.changePassword = async (req, res) => {
-  try {
-    const { currentPassword, newPassword } = req.body;
-    const userId = req.user.id;
-
-    if (!currentPassword || !newPassword) {
-      return res.status(400).json({ error: 'Current and new passwords are required' });
-    }
-
-    const user = await User.findById(userId);
-    if (!user) return res.status(404).json({ error: 'User not found' });
-
-    const isMatch = await bcrypt.compare(currentPassword, user.password);
-    if (!isMatch) return res.status(400).json({ error: 'Current password is incorrect' });
-
-    user.password = await bcrypt.hash(newPassword, 10);
-    await user.save();
-
-    // Notify user by email
-    await transporter.sendMail({
-      from: `"MES HR" <${process.env.EMAIL_USER}>`,
-      to: user.email,
-      subject: '🔐 Password Changed - MES HR Portal',
-      html: `<p>Hello ${user.name},</p><p>Your password was successfully changed. If this was not you, please contact support immediately.</p>`,
-    });
-
-    res.json({ message: 'Password changed successfully' });
-  } catch (err) {
-    console.error('Change password error:', err);
-    res.status(500).json({ error: 'Server error during password change' });
-  }
-};
-
-/**
- * @desc Send password reset email with expiring token
- */
+// 🔁 Forgot Password
 exports.forgotPassword = async (req, res) => {
   try {
     const { email: rawEmail } = req.body;
-
     if (!rawEmail) return res.status(400).json({ error: 'Email is required' });
-    const email = rawEmail.toLowerCase();
 
+    const email = rawEmail.toLowerCase();
     const user = await User.findOne({ email });
     if (!user) return res.status(400).json({ error: 'User not found' });
 
-    // Generate reset token and expiry (1 hour)
     const resetToken = crypto.randomBytes(32).toString('hex');
     user.resetToken = resetToken;
-    user.resetTokenExpires = Date.now() + 3600000; // 1 hour expiry
+    user.resetTokenExpires = Date.now() + 3600000; // 1 hr
     await user.save();
 
     const resetLink = `${frontendURL.replace(/\/$/, '')}/reset-password/${resetToken}`;
-
     await transporter.sendMail({
       from: `"MES HR" <${process.env.EMAIL_USER}>`,
       to: email,
       subject: '🔑 Reset Your Password - MES HR Portal',
       html: `
         <p>Hello,</p>
-        <p>You requested to reset your password. Click the link below to proceed:</p>
-        <a href="${resetLink}">🔁 Reset Password</a>
-        <p>This link will expire in 1 hour.</p>
-        <p>If you did not request this, please ignore this email.</p>
+        <p>You requested to reset your password. Click below:</p>
+        <a href="${resetLink}">Reset Password</a>
+        <p>This link expires in 1 hour.</p>
       `,
     });
 
-    res.json({ message: 'Password reset link sent to your email.' });
+    res.json({ message: 'Password reset link sent to email.' });
   } catch (err) {
     console.error('Forgot password error:', err);
     res.status(500).json({ error: 'Server error sending password reset email' });
   }
 };
 
-/**
- * @desc Reset password using reset token
- */
+// ✅ Reset Password
 exports.resetPassword = async (req, res) => {
   try {
     const { token } = req.params;
     const { password: newPassword } = req.body;
 
+    console.log('🔑 Token:', token);
+    console.log('🔒 New password:', newPassword);
+
     if (!newPassword) return res.status(400).json({ error: 'New password is required' });
 
-    // Find user with valid reset token and unexpired
     const user = await User.findOne({
       resetToken: token,
       resetTokenExpires: { $gt: Date.now() },
     });
-    if (!user) return res.status(400).json({ error: 'Invalid or expired reset token' });
+
+    if (!user) {
+      console.log('❌ Invalid or expired reset token');
+      return res.status(400).json({ error: 'Invalid or expired reset token' });
+    }
 
     user.password = await bcrypt.hash(newPassword, 10);
     user.resetToken = undefined;
     user.resetTokenExpires = undefined;
     await user.save();
 
-    // Notify user about password reset
     await transporter.sendMail({
       from: `"MES HR" <${process.env.EMAIL_USER}>`,
       to: user.email,
       subject: '✅ Password Reset Successful - MES HR Portal',
-      html: `<p>Hello ${user.name},</p><p>Your password has been reset successfully.</p>`,
+      html: `<p>Hello ${user.name},</p><p>Your password was reset successfully.</p>`,
     });
 
     res.json({ message: 'Password reset successful' });
   } catch (err) {
     console.error('Reset password error:', err);
     res.status(500).json({ error: 'Server error during password reset' });
+  }
+};
+
+// 🔐 Change Password (Logged-in user)
+exports.changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const userId = req.user.id;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Current and new passwords required' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) return res.status(400).json({ error: 'Incorrect current password' });
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    await user.save();
+
+    await transporter.sendMail({
+      from: `"MES HR" <${process.env.EMAIL_USER}>`,
+      to: user.email,
+      subject: '🔐 Password Changed - MES HR Portal',
+      html: `<p>Hello ${user.name},</p><p>Your password was changed successfully. If this wasn't you, contact support.</p>`,
+    });
+
+    res.json({ message: 'Password changed successfully' });
+  } catch (err) {
+    console.error('Change password error:', err);
+    res.status(500).json({ error: 'Server error changing password' });
   }
 };
