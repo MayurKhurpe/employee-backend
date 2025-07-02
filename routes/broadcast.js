@@ -16,11 +16,8 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// 🔐 Secure all broadcast routes
-router.use(protect, isAdmin);
-
-// 📩 Send a new broadcast message
-router.post('/', async (req, res) => {
+// 🔐 Only secure some routes (not all)
+router.post('/', protect, isAdmin, async (req, res) => {
   try {
     const { message, audience, pinned, expiresAt } = req.body;
 
@@ -35,7 +32,7 @@ router.post('/', async (req, res) => {
       expiresAt: expiresAt || null,
     });
 
-    // 📧 Notify all approved and verified users
+    // 📧 Notify all approved + verified users
     const users = await User.find({ isApproved: true, isVerified: true });
     const emailList = users.map(u => u.email);
 
@@ -55,15 +52,21 @@ router.post('/', async (req, res) => {
   }
 });
 
-// 📜 Get all broadcasts
-router.get('/', async (req, res) => {
+// ✅ 🔓 Public to all logged-in users
+router.get('/', protect, async (req, res) => {
   try {
     const now = new Date();
+    const userRole = req.user.role || 'employee'; // default fallback
+
     const broadcasts = await Broadcast.find({
       $or: [
-        { expiresAt: null },
-        { expiresAt: { $gte: now } },
+        { audience: 'all' },
+        { audience: userRole }
       ],
+      $or: [
+        { expiresAt: null },
+        { expiresAt: { $gte: now } }
+      ]
     }).sort({ pinned: -1, createdAt: -1 });
 
     res.json(broadcasts);
@@ -73,8 +76,8 @@ router.get('/', async (req, res) => {
   }
 });
 
-// 🗑️ Delete a broadcast by ID
-router.delete('/:id', async (req, res) => {
+// 🗑️ Delete a broadcast by ID (admin only)
+router.delete('/:id', protect, isAdmin, async (req, res) => {
   try {
     await Broadcast.findByIdAndDelete(req.params.id);
     res.json({ message: '🗑️ Broadcast deleted' });
