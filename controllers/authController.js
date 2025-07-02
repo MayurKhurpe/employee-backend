@@ -60,7 +60,9 @@ exports.verifyEmail = async (req, res) => {
 
     user.isVerified = true;
     user.verificationToken = undefined;
-    await user.save();
+    user.markModified('resetTokenExpires');
+await user.save();
+
 
     res.json({ message: 'Email verified successfully!' });
   } catch (err) {
