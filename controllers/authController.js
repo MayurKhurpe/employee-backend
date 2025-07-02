@@ -111,18 +111,11 @@ exports.forgotPassword = async (req, res) => {
     if (!user) return res.status(400).json({ error: 'User not found' });
 
     const resetToken = crypto.randomBytes(32).toString('hex');
-    const expires = new Date(Date.now() + 3600000); // 1 hour
+    const expires = new Date(Date.now() + 12 * 60 * 60 * 1000); // ✅ 12 hours
 
     user.resetToken = resetToken;
     user.resetTokenExpires = expires;
-    user.markModified('resetTokenExpires'); // 🔧 Fix for Render/Mongoose bug
-
-    console.log('🧪 Reset Token:', resetToken);
-    console.log('🕒 Expires:', expires);
-
-    await user.save();
-
-    console.log('✅ Saved user resetTokenExpires:', user.resetTokenExpires);
+    await user.save(); // ✅ no markModified needed now
 
     const resetLink = `${frontendURL.replace(/\/$/, '')}/reset-password/${resetToken}`;
     await transporter.sendMail({
@@ -131,9 +124,9 @@ exports.forgotPassword = async (req, res) => {
       subject: '🔑 Reset Your Password - MES HR Portal',
       html: `
         <p>Hello,</p>
-        <p>You requested to reset your password. Click below:</p>
+        <p>Click below to reset your password:</p>
         <a href="${resetLink}">Reset Password</a>
-        <p>This link expires in 1 hour.</p>
+        <p>This link is valid for 12 hours.</p>
       `,
     });
 
@@ -143,6 +136,7 @@ exports.forgotPassword = async (req, res) => {
     res.status(500).json({ error: 'Server error sending password reset email' });
   }
 };
+
 
 // ✅ Reset Password
 exports.resetPassword = async (req, res) => {
