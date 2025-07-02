@@ -196,7 +196,8 @@ app.use('/api/leave', protect, require('./routes/leave'));
 app.use('/api/birthdays', protect, require('./routes/birthday'));
 app.use('/api/news', protect, require('./routes/news'));
 app.use('/api/holidays', protect, require('./routes/holiday'));
-app.use('/api/admin/broadcasts', require('./routes/broadcast'));
+app.use('/api/broadcasts', require('./routes/broadcast'));         // for public fetch
+app.use('/api/admin/broadcasts', require('./routes/broadcast'));   // for admin controls
 app.use('/api/notification-settings', protect, require('./routes/notification'));
 app.use('/api/admin', protect, isAdmin, require('./routes/admin'));
 app.use('/api/events', protect, require('./routes/eventRoutes'));
