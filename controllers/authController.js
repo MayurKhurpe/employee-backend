@@ -60,9 +60,7 @@ exports.verifyEmail = async (req, res) => {
 
     user.isVerified = true;
     user.verificationToken = undefined;
-    user.markModified('resetTokenExpires');
-await user.save();
-
+    await user.save();
 
     res.json({ message: 'Email verified successfully!' });
   } catch (err) {
@@ -102,7 +100,7 @@ exports.login = async (req, res) => {
   }
 };
 
-// 🔁 Forgot Password
+// 🔁 Forgot Password (Final Working)
 exports.forgotPassword = async (req, res) => {
   try {
     const { email: rawEmail } = req.body;
@@ -113,11 +111,12 @@ exports.forgotPassword = async (req, res) => {
     if (!user) return res.status(400).json({ error: 'User not found' });
 
     const resetToken = crypto.randomBytes(32).toString('hex');
-    const expires = new Date(Date.now() + 12 * 60 * 60 * 1000); // ✅ 12 hours
+    const expires = new Date(Date.now() + 12 * 60 * 60 * 1000); // ⏰ 12 hours
 
     user.resetToken = resetToken;
     user.resetTokenExpires = expires;
-    await user.save(); // ✅ no markModified needed now
+    user.markModified('resetTokenExpires'); // 👈 FORCE SAVE
+    await user.save(); // ✅ Now MongoDB will store it
 
     const resetLink = `${frontendURL.replace(/\/$/, '')}/reset-password/${resetToken}`;
     await transporter.sendMail({
@@ -126,7 +125,7 @@ exports.forgotPassword = async (req, res) => {
       subject: '🔑 Reset Your Password - MES HR Portal',
       html: `
         <p>Hello,</p>
-        <p>Click below to reset your password:</p>
+        <p>You requested to reset your password. Click below:</p>
         <a href="${resetLink}">Reset Password</a>
         <p>This link is valid for 12 hours.</p>
       `,
@@ -134,10 +133,11 @@ exports.forgotPassword = async (req, res) => {
 
     res.json({ message: 'Password reset link sent to email.' });
   } catch (err) {
-    console.error('Forgot password error:', err);
+    console.error('❌ Forgot password error:', err);
     res.status(500).json({ error: 'Server error sending password reset email' });
   }
 };
+
 
 
 // ✅ Reset Password
