@@ -1,3 +1,4 @@
+// 📁 models/User.js
 const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema(
@@ -65,7 +66,15 @@ const userSchema = new mongoose.Schema(
       type: String,
     },
 
-    // ✅ Profile Picture support (optional if you plan to use it)
+    // ✅ Reset password support
+    resetToken: {
+      type: String,
+    },
+    resetTokenExpires: {
+      type: Date,
+    },
+
+    // ✅ Profile image support
     profileImage: {
       type: String,
       default: '',
