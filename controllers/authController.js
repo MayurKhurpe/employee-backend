@@ -17,7 +17,7 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// 📩 Register
+// ✅ Register
 exports.register = async (req, res) => {
   try {
     const { name, email: rawEmail, password } = req.body;
@@ -111,9 +111,18 @@ exports.forgotPassword = async (req, res) => {
     if (!user) return res.status(400).json({ error: 'User not found' });
 
     const resetToken = crypto.randomBytes(32).toString('hex');
+    const expires = new Date(Date.now() + 3600000); // 1 hour
+
     user.resetToken = resetToken;
-    user.resetTokenExpires = new Date(Date.now() + 3600000); // 1 hr
+    user.resetTokenExpires = expires;
+    user.markModified('resetTokenExpires'); // 🔧 Fix for Render/Mongoose bug
+
+    console.log('🧪 Reset Token:', resetToken);
+    console.log('🕒 Expires:', expires);
+
     await user.save();
+
+    console.log('✅ Saved user resetTokenExpires:', user.resetTokenExpires);
 
     const resetLink = `${frontendURL.replace(/\/$/, '')}/reset-password/${resetToken}`;
     await transporter.sendMail({
@@ -175,7 +184,7 @@ exports.resetPassword = async (req, res) => {
   }
 };
 
-// 🔐 Change Password (Logged-in user)
+// 🔐 Change Password
 exports.changePassword = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
