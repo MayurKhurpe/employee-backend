@@ -204,6 +204,9 @@ app.use('/api/events', protect, require('./routes/eventRoutes'));
 // ✅ ✅ ✅ ✅ NEW: Change Password Route Added
 app.use('/api/change-password', protect, require('./routes/changePassword'));
 
+// ✅ ✅ ✅ ✅ NEW: USERS DROPDOWN API (REQUIRED FOR FILTER)
+app.use('/users', protect, isAdmin, require('./routes/userRoutes')); // <-- ✅ added this line
+
 // ⏰ Daily Background Jobs
 require('./scheduler');
 
