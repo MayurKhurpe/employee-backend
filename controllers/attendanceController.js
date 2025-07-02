@@ -12,7 +12,6 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// Helper to get start-of-day (00:00:00)
 const getStartOfDay = (date) => {
   const d = new Date(date);
   d.setHours(0, 0, 0, 0);
@@ -104,48 +103,81 @@ exports.getMyAttendance = async (req, res) => {
   }
 };
 
-// ✅ FINAL: Get All Attendance (Admin) with Unmarked Users + Pagination
+// ✅ Get All Attendance (Admin) with month/user filters
 exports.getAllAttendance = async (req, res) => {
   try {
-    const { page = 1, limit = 10, date } = req.query;
-    const queryDate = date ? getStartOfDay(new Date(date)) : getStartOfDay(new Date());
+    const { page = 1, limit = 10, date, month, userId } = req.query;
+
+    // Prepare date filter
+    let queryDate = null;
+    if (date) queryDate = getStartOfDay(new Date(date));
 
     // Get all employees
     const users = await User.find({ role: 'employee' }).select('_id name email');
 
-    // Get attendance records for the date
-    const markedRecords = await Attendance.find({ date: queryDate });
+    // Apply month or date filter
+    let attendanceFilter = {};
+    if (queryDate) {
+      attendanceFilter.date = queryDate;
+    } else if (month) {
+      const [y, m] = month.split('-').map(Number);
+      const start = new Date(y, m - 1, 1);
+      const end = new Date(y, m, 0, 23, 59, 59, 999);
+      attendanceFilter.date = { $gte: start, $lte: end };
+    }
+
+    if (userId) {
+      attendanceFilter.userId = userId;
+    }
+
+    const markedRecords = await Attendance.find(attendanceFilter);
 
     // Map userId => attendance record
     const attendanceMap = new Map();
     markedRecords.forEach((rec) => {
-      attendanceMap.set(rec.userId.toString(), rec);
+      attendanceMap.set(rec.userId.toString() + rec.date?.toISOString(), rec);
     });
 
-    // Merge attendance with users, add placeholder for unmarked
-    const fullRecords = users.map((user) => {
-      const rec = attendanceMap.get(user._id.toString());
-      if (rec) return rec;
-      return {
-        _id: 'not-marked-' + user._id,
-        userId: user._id,
-        name: user.name,
-        email: user.email,
-        date: queryDate,
-        status: 'Not Marked Yet',
-        checkInTime: null,
-        checkOutTime: null,
-        location: '—',
-        customer: '—',
-        workLocation: '—',
-        assignedBy: '—',
-      };
-    });
+    // Filter users if specific userId
+    const filteredUsers = userId
+      ? users.filter((u) => u._id.toString() === userId)
+      : users;
 
-    // Sort by name alphabetically
-    const sorted = fullRecords.sort((a, b) => a.name.localeCompare(b.name));
+    let fullRecords = [];
 
-    // Pagination logic
+    if (queryDate || userId || month) {
+      // One record per user (specific date or month)
+      fullRecords = filteredUsers.map((user) => {
+        const key = month
+          ? null // for month, we allow multiple
+          : userId
+          ? markedRecords.find((r) => r.userId.toString() === user._id.toString())
+          : attendanceMap.get(user._id.toString() + queryDate?.toISOString());
+
+        return key || {
+          _id: 'not-marked-' + user._id,
+          userId: user._id,
+          name: user.name,
+          email: user.email,
+          date: queryDate || new Date(),
+          status: 'Not Marked Yet',
+          checkInTime: null,
+          checkOutTime: null,
+          location: '—',
+          customer: '—',
+          workLocation: '—',
+          assignedBy: '—',
+        };
+      });
+
+      // If month is used, return all found for that user/month (not placeholder)
+      if (month) {
+        fullRecords = markedRecords.map((rec) => rec.toObject());
+      }
+    }
+
+    // Sort and paginate
+    const sorted = fullRecords.sort((a, b) => new Date(b.date) - new Date(a.date));
     const start = (page - 1) * limit;
     const paginated = sorted.slice(start, start + Number(limit));
     const totalPages = Math.ceil(fullRecords.length / limit);
@@ -189,7 +221,7 @@ exports.updateCheckout = async (req, res) => {
   }
 };
 
-// ✅ Updated: Admin Summary with ?date support
+// ✅ Updated Summary with Date support
 exports.getSummary = async (req, res) => {
   try {
     const queryDate = req.query.date ? getStartOfDay(new Date(req.query.date)) : getStartOfDay(new Date());
@@ -230,7 +262,7 @@ exports.getSummary = async (req, res) => {
   }
 };
 
-// ✅ My Summary (for dashboard widget)
+// ✅ My Summary
 exports.getMySummary = async (req, res) => {
   try {
     const userId = req.user.userId;
