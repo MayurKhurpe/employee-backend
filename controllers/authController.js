@@ -1,5 +1,3 @@
-// 📁 controllers/authController.js
-
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -16,6 +14,12 @@ const transporter = nodemailer.createTransport({
     pass: process.env.EMAIL_PASS,
   },
 });
+
+// ✅ Email Mask Helper
+function maskEmail(email) {
+  const [user, domain] = email.split('@');
+  return `${user.slice(0, 2)}****@${domain}`;
+}
 
 // ✅ Register
 exports.register = async (req, res) => {
@@ -100,69 +104,75 @@ exports.login = async (req, res) => {
   }
 };
 
-// 🔁 Forgot Password (Final Working)
-exports.forgotPassword = async (req, res) => {
+// ✅ 1. Send OTP
+exports.sendOTP = async (req, res) => {
   try {
     const { email: rawEmail } = req.body;
     if (!rawEmail) return res.status(400).json({ error: 'Email is required' });
 
     const email = rawEmail.toLowerCase();
     const user = await User.findOne({ email });
-    if (!user) return res.status(400).json({ error: 'User not found' });
+    if (!user) return res.status(400).json({ error: 'No account found with that email' });
 
-    const resetToken = crypto.randomBytes(32).toString('hex');
-    const expires = new Date(Date.now() + 12 * 60 * 60 * 1000); // ⏰ 12 hours
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expires = new Date(Date.now() + 10 * 60 * 1000); // 10 min
 
-    user.resetToken = resetToken;
+    user.resetToken = otp;
     user.resetTokenExpires = expires;
-    user.markModified('resetTokenExpires'); // 👈 FORCE SAVE
-    console.log("📩 Email:", email);
-    console.log("🔑 Token:", resetToken);
-    console.log("⏰ Expires At:", user.resetTokenExpires);
-    await user.save(); // ✅ Now MongoDB will store it
-    console.log("✅ Saved! Final user:", await User.findOne({ email }));
+    await user.save();
 
-    const resetLink = `${frontendURL.replace(/\/$/, '')}/reset-password/${resetToken}`;
     await transporter.sendMail({
       from: `"MES HR" <${process.env.EMAIL_USER}>`,
       to: email,
-      subject: '🔑 Reset Your Password - MES HR Portal',
-      html: `
-        <p>Hello,</p>
-        <p>You requested to reset your password. Click below:</p>
-        <a href="${resetLink}">Reset Password</a>
-        <p>This link is valid for 12 hours.</p>
-      `,
+      subject: '🔐 Your OTP - MES HR Portal',
+      html: `<p>Your OTP for password reset is: <strong>${otp}</strong><br/>It expires in 10 minutes.</p>`,
     });
 
-    res.json({ message: 'Password reset link sent to email.' });
+    res.json({ message: `OTP sent to ${maskEmail(email)}` });
   } catch (err) {
-    console.error('❌ Forgot password error:', err);
-    res.status(500).json({ error: 'Server error sending password reset email' });
+    console.error('Send OTP error:', err);
+    res.status(500).json({ error: 'Server error sending OTP' });
   }
 };
 
-
-// ✅ Reset Password
-exports.resetPassword = async (req, res) => {
+// ✅ 2. Verify OTP
+exports.verifyOTP = async (req, res) => {
   try {
-    const { token } = req.params;
-    const { password: newPassword } = req.body;
+    const { email: rawEmail, otp } = req.body;
+    if (!rawEmail || !otp) return res.status(400).json({ error: 'Email and OTP required' });
 
-    console.log('🔑 Token:', token);
-    console.log('🔒 New password:', newPassword);
-
-    if (!newPassword) return res.status(400).json({ error: 'New password is required' });
-
+    const email = rawEmail.toLowerCase();
     const user = await User.findOne({
-      resetToken: token,
+      email,
+      resetToken: otp,
       resetTokenExpires: { $gt: Date.now() },
     });
 
-    if (!user) {
-      console.log('❌ Invalid or expired reset token');
-      return res.status(400).json({ error: 'Invalid or expired reset token' });
+    if (!user) return res.status(400).json({ error: 'Invalid or expired OTP' });
+
+    res.json({ message: 'OTP verified. You can now reset your password.' });
+  } catch (err) {
+    console.error('Verify OTP error:', err);
+    res.status(500).json({ error: 'Server error verifying OTP' });
+  }
+};
+
+// ✅ 3. Set New Password
+exports.setNewPassword = async (req, res) => {
+  try {
+    const { email: rawEmail, otp, newPassword } = req.body;
+    if (!rawEmail || !otp || !newPassword) {
+      return res.status(400).json({ error: 'Email, OTP and new password are required' });
     }
+
+    const email = rawEmail.toLowerCase();
+    const user = await User.findOne({
+      email,
+      resetToken: otp,
+      resetTokenExpires: { $gt: Date.now() },
+    });
+
+    if (!user) return res.status(400).json({ error: 'Invalid or expired OTP' });
 
     user.password = await bcrypt.hash(newPassword, 10);
     user.resetToken = undefined;
@@ -171,19 +181,19 @@ exports.resetPassword = async (req, res) => {
 
     await transporter.sendMail({
       from: `"MES HR" <${process.env.EMAIL_USER}>`,
-      to: user.email,
-      subject: '✅ Password Reset Successful - MES HR Portal',
-      html: `<p>Hello ${user.name},</p><p>Your password was reset successfully.</p>`,
+      to: email,
+      subject: '✅ Password Reset Successful',
+      html: `<p>Hello ${user.name},<br/>Your password was reset successfully.</p>`,
     });
 
     res.json({ message: 'Password reset successful' });
   } catch (err) {
-    console.error('Reset password error:', err);
-    res.status(500).json({ error: 'Server error during password reset' });
+    console.error('Set new password error:', err);
+    res.status(500).json({ error: 'Server error setting new password' });
   }
 };
 
-// 🔐 Change Password
+// ✅ Change Password (from logged in user)
 exports.changePassword = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
@@ -206,7 +216,7 @@ exports.changePassword = async (req, res) => {
       from: `"MES HR" <${process.env.EMAIL_USER}>`,
       to: user.email,
       subject: '🔐 Password Changed - MES HR Portal',
-      html: `<p>Hello ${user.name},</p><p>Your password was changed successfully. If this wasn't you, contact support.</p>`,
+      html: `<p>Hello ${user.name},<br/>Your password was changed successfully. If this wasn't you, contact support.</p>`,
     });
 
     res.json({ message: 'Password changed successfully' });

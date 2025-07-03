@@ -1,17 +1,21 @@
 // 📁 routes/auth.js
+
 const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/authController');
-const authMiddleware = require('../middleware/auth');
+const { protect } = require('../middleware/auth');
 
-// 🔐 Auth Routes
+// ✅ Public routes
 router.post('/register', authController.register);
 router.get('/verify-email/:token', authController.verifyEmail);
 router.post('/login', authController.login);
-router.post('/change-password', authMiddleware, authController.changePassword);
 
-// ✅ Forgot & Reset Password Routes
-router.post('/forgot-password', authController.forgotPassword);
-router.post('/reset-password/:token', authController.resetPassword);
+// ✅ New OTP Password Reset Routes
+router.post('/send-otp', authController.sendOTP);
+router.post('/verify-otp', authController.verifyOTP);
+router.post('/set-new-password', authController.setNewPassword);
+
+// ✅ Protected route
+router.post('/change-password', protect, authController.changePassword);
 
 module.exports = router;
