@@ -208,6 +208,9 @@ app.use('/api/change-password', protect, require('./routes/changePassword'));
 // ✅ ✅ ✅ ✅ NEW: USERS DROPDOWN API (REQUIRED FOR FILTER)
 app.use('/api/users', protect, isAdmin, require('./routes/userRoutes')); // <-- ✅ added this line
 
+// ✅ ✅ ✅ ✅ ADD THIS NEW PING ROUTE BELOW
+app.use('/api', require('./routes/ping'));
+
 // ⏰ Daily Background Jobs
 require('./scheduler');
 

@@ -116,7 +116,11 @@ exports.forgotPassword = async (req, res) => {
     user.resetToken = resetToken;
     user.resetTokenExpires = expires;
     user.markModified('resetTokenExpires'); // 👈 FORCE SAVE
+    console.log("📩 Email:", email);
+    console.log("🔑 Token:", resetToken);
+    console.log("⏰ Expires At:", user.resetTokenExpires);
     await user.save(); // ✅ Now MongoDB will store it
+    console.log("✅ Saved! Final user:", await User.findOne({ email }));
 
     const resetLink = `${frontendURL.replace(/\/$/, '')}/reset-password/${resetToken}`;
     await transporter.sendMail({
@@ -137,7 +141,6 @@ exports.forgotPassword = async (req, res) => {
     res.status(500).json({ error: 'Server error sending password reset email' });
   }
 };
-
 
 
 // ✅ Reset Password
