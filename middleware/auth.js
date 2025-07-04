@@ -18,7 +18,7 @@ const protect = async (req, res, next) => {
     const decoded = jwt.verify(token, secret);
 
     // ✅ Fetch full user info (name, email, role, etc.)
-    const user = await User.findById(decoded.id).select("name email role");
+    const user = await User.findById(decoded.userId).select("name email role");
 
     if (!user) {
       return res.status(401).json({ message: "❌ User not found" });
