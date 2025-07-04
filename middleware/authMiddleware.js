@@ -1,43 +1,41 @@
+const express = require("express");
+const router = express.Router();
 const jwt = require("jsonwebtoken");
+const bcrypt = require("bcryptjs");
+const User = require("../models/User");
+const { jwtSecret } = require("../config"); // or use process.env.JWT_SECRET
 
-// ✅ Use env or fallback secret
-const JWT_SECRET = process.env.JWT_SECRET || require("../config").jwtSecret;
-
-/**
- * 🔐 Middleware: Protect routes by verifying JWT token
- * Attaches decoded user object to req.user
- */
-const protect = (req, res, next) => {
-  const authHeader = req.header("Authorization");
-
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return res.status(401).json({
-      message: "🚫 Access denied. Token missing or malformed.",
-    });
-  }
-
-  const token = authHeader.split(" ")[1];
+// ✅ POST /api/login
+router.post("/login", async (req, res) => {
+  const { email, password } = req.body;
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded; // Contains: { userId, email, role, name, ... }
-    next();
+    // 🔍 Find user
+    const user = await User.findOne({ email });
+    if (!user) return res.status(400).json({ message: "User not found" });
+
+    // 🔒 Check password
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch)
+      return res.status(401).json({ message: "Invalid credentials" });
+
+    // 🧾 Create token (✅ use userId instead of id)
+    const token = jwt.sign(
+      {
+        userId: user._id, // 👈 This is important
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
+      jwtSecret,
+      { expiresIn: "2h" }
+    );
+
+    res.json({ token });
   } catch (err) {
-    console.error("❌ Token verification failed:", err.message);
-    return res.status(401).json({ message: "❌ Invalid or expired token." });
+    console.error("Login error:", err.message);
+    res.status(500).json({ message: "Server error" });
   }
-};
+});
 
-/**
- * 👑 Middleware: Only allow admin role
- * Must be used after `protect`
- */
-const isAdmin = (req, res, next) => {
-  if (req.user && req.user.role === "admin") {
-    next();
-  } else {
-    res.status(403).json({ message: "⛔ Admin access only." });
-  }
-};
-
-module.exports = { protect, isAdmin };
+module.exports = router;
