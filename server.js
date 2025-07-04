@@ -44,6 +44,7 @@ app.options('*', cors(corsOptions));
 app.use(express.json());
 app.use(helmet());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/api', require('./routes/auth'));
 
 // ✅ MongoDB
 mongoose.connect(process.env.MONGO_URI)
