@@ -8,6 +8,7 @@ const NotificationSetting = require('../models/NotificationSetting');
 const User = require('../models/User');
 require('dotenv').config();
 
+// ✅ Import controller functions
 const {
   getProfile,
   updateProfile,
@@ -33,51 +34,43 @@ const transporter = nodemailer.createTransport({
 // ✅ GET Logged-in User Profile
 router.get('/', protect, getProfile);
 
-// ✅ UPDATE Profile with audit + email
+// ✅ UPDATE Profile
 router.put('/', protect, async (req, res) => {
-  try {
-    await updateProfile(req, res);
+  await updateProfile(req, res);
 
-    await AuditLog.create({
-      user: req.user,
-      action: 'Updated Profile',
-      details: `Updated fields: ${Object.keys(req.body).join(', ')}`,
-      ip: req.ip,
-    });
+  // 🔐 Log the update
+  await AuditLog.create({
+    user: req.user,
+    action: 'Updated Profile',
+    details: `Updated fields: ${Object.keys(req.body).join(', ')}`,
+    ip: req.ip,
+  });
 
-    const setting = await NotificationSetting.findOne({ userId: req.user.userId });
-    if (setting?.emailNotif) {
-      const user = await User.findById(req.user.userId);
-      if (user) {
-        await transporter.sendMail({
-          from: process.env.EMAIL_USER,
-          to: user.email,
-          subject: '📋 Your Profile was Updated',
-          html: `<p>Hello ${user.name},<br>Your profile was successfully updated on ${new Date().toLocaleString()}.</p>`,
-        });
-      }
+  // ✉️ Send notification if enabled
+  const setting = await NotificationSetting.findOne({ userId: req.user.userId });
+  if (setting?.emailNotif) {
+    const user = await User.findById(req.user.userId);
+    if (user) {
+      await transporter.sendMail({
+        from: process.env.EMAIL_USER,
+        to: user.email,
+        subject: '📋 Your Profile was Updated',
+        html: `<p>Hello ${user.name},<br>Your profile was successfully updated on ${new Date().toLocaleString()}.</p>`,
+      });
     }
-  } catch (err) {
-    console.error('❌ Profile update failed:', err);
-    res.status(500).json({ error: 'Something went wrong' });
   }
 });
 
-// ✅ UPLOAD Profile Picture with audit
+// ✅ UPLOAD Profile Picture
 router.post('/upload', protect, upload.single('profileImage'), async (req, res) => {
-  try {
-    await uploadProfilePicture(req, res);
+  await uploadProfilePicture(req, res);
 
-    await AuditLog.create({
-      user: req.user,
-      action: 'Uploaded Profile Picture',
-      details: req.file?.filename || 'No file name',
-      ip: req.ip,
-    });
-  } catch (err) {
-    console.error('❌ Profile picture upload failed:', err);
-    res.status(500).json({ error: 'Something went wrong' });
-  }
+  await AuditLog.create({
+    user: req.user,
+    action: 'Uploaded Profile Picture',
+    details: req.file?.filename || 'No file name',
+    ip: req.ip,
+  });
 });
 
 module.exports = router;
