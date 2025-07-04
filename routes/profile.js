@@ -8,7 +8,6 @@ const NotificationSetting = require('../models/NotificationSetting');
 const User = require('../models/User');
 require('dotenv').config();
 
-// ✅ Destructured controller imports
 const {
   getProfile,
   updateProfile,
@@ -34,9 +33,11 @@ const transporter = nodemailer.createTransport({
 // ✅ GET Logged-in User Profile
 router.get('/', protect, getProfile);
 
-// ✅ UPDATE Profile
-router.put('/', protect, async (req, res, next) => {
-  await updateProfile(req, res, async () => {
+// ✅ UPDATE Profile with audit + email
+router.put('/', protect, async (req, res) => {
+  try {
+    await updateProfile(req, res);
+
     await AuditLog.create({
       user: req.user,
       action: 'Updated Profile',
@@ -56,22 +57,27 @@ router.put('/', protect, async (req, res, next) => {
         });
       }
     }
-
-    next();
-  });
+  } catch (err) {
+    console.error('❌ Profile update failed:', err);
+    res.status(500).json({ error: 'Something went wrong' });
+  }
 });
 
-// ✅ UPLOAD Profile Picture
-router.post('/upload', protect, upload.single('profileImage'), async (req, res, next) => {
-  await uploadProfilePicture(req, res, async () => {
+// ✅ UPLOAD Profile Picture with audit
+router.post('/upload', protect, upload.single('profileImage'), async (req, res) => {
+  try {
+    await uploadProfilePicture(req, res);
+
     await AuditLog.create({
       user: req.user,
       action: 'Uploaded Profile Picture',
       details: req.file?.filename || 'No file name',
       ip: req.ip,
     });
-    next();
-  });
+  } catch (err) {
+    console.error('❌ Profile picture upload failed:', err);
+    res.status(500).json({ error: 'Something went wrong' });
+  }
 });
 
 module.exports = router;
