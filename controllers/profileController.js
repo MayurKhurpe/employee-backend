@@ -35,7 +35,7 @@ const updateProfile = async (req, res) => {
     bloodGroup,
     department,
     joiningDate,
-    dob // ✅ New field for birthday
+    dob
   } = req.body;
 
   try {
@@ -79,7 +79,6 @@ const uploadProfilePicture = async (req, res) => {
     const user = await User.findById(req.user.userId);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    // 🧹 Delete old profile image
     if (user.profileImage) {
       const oldPath = path.join(__dirname, '..', 'uploads', user.profileImage);
       if (fs.existsSync(oldPath)) {
@@ -87,7 +86,6 @@ const uploadProfilePicture = async (req, res) => {
       }
     }
 
-    // 💾 Save new image
     user.profileImage = req.file.filename;
     await user.save();
 
@@ -101,5 +99,5 @@ const uploadProfilePicture = async (req, res) => {
 module.exports = {
   getProfile,
   updateProfile,
-  uploadProfilePicture,
+  uploadProfilePicture
 };
