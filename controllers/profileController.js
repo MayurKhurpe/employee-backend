@@ -1,7 +1,5 @@
 // 📁 controllers/profileController.js
 const User = require('../models/User');
-const fs = require('fs');
-const path = require('path');
 
 /**
  * @route   GET /api/profile
@@ -69,35 +67,7 @@ const updateProfile = async (req, res) => {
   }
 };
 
-/**
- * @route   POST /api/profile/upload
- * @desc    Upload or update profile picture
- * @access  Private
- */
-const uploadProfilePicture = async (req, res) => {
-  try {
-    const user = await User.findById(req.user.userId);
-    if (!user) return res.status(404).json({ error: 'User not found' });
-
-    if (user.profileImage) {
-      const oldPath = path.join(__dirname, '..', 'uploads', user.profileImage);
-      if (fs.existsSync(oldPath)) {
-        fs.unlinkSync(oldPath);
-      }
-    }
-
-    user.profileImage = req.file.filename;
-    await user.save();
-
-    res.status(200).json({ message: 'Profile picture updated', filename: req.file.filename });
-  } catch (err) {
-    console.error('❌ Upload failed:', err);
-    res.status(500).json({ error: 'Profile picture upload failed' });
-  }
-};
-
 module.exports = {
   getProfile,
-  updateProfile,
-  uploadProfilePicture
+  updateProfile
 };

@@ -2,20 +2,12 @@
 const express = require('express');
 const router = express.Router();
 const { protect } = require('../middleware/authMiddleware');
-const multer = require('multer');
 const nodemailer = require('nodemailer');
 const profileController = require('../controllers/profileController');
 const AuditLog = require('../models/AuditLog');
 const NotificationSetting = require('../models/NotificationSetting');
 const User = require('../models/User');
 require('dotenv').config();
-
-// 📂 Multer Storage Config
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, 'uploads/'),
-  filename: (req, file, cb) => cb(null, Date.now() + '-' + file.originalname),
-});
-const upload = multer({ storage });
 
 // 📧 Nodemailer Setup
 const transporter = nodemailer.createTransport({
@@ -27,14 +19,7 @@ const transporter = nodemailer.createTransport({
 });
 
 // ✅ GET Logged-in User Profile
-router.get('/', protect, (req, res) => {
-  if (typeof profileController.getProfile === 'function') {
-    profileController.getProfile(req, res);
-  } else {
-    console.error('❌ getProfile not found in profileController');
-    res.status(500).json({ error: 'getProfile method missing in controller' });
-  }
-});
+router.get('/', protect, profileController.getProfile);
 
 // ✅ UPDATE Profile
 router.put('/', protect, async (req, res, next) => {
@@ -46,6 +31,7 @@ router.put('/', protect, async (req, res, next) => {
       ip: req.ip,
     });
 
+    // 📧 Optional Email Notification
     const setting = await NotificationSetting.findOne({ userId: req.user.id });
     if (setting?.emailNotif) {
       const user = await User.findById(req.user.id);
@@ -59,19 +45,6 @@ router.put('/', protect, async (req, res, next) => {
       }
     }
 
-    next();
-  });
-});
-
-// ✅ UPLOAD Profile Picture
-router.post('/upload', protect, upload.single('profileImage'), async (req, res, next) => {
-  await profileController.uploadProfilePicture(req, res, async () => {
-    await AuditLog.create({
-      user: req.user,
-      action: 'Uploaded Profile Picture',
-      details: req.file?.filename || 'No file name',
-      ip: req.ip,
-    });
     next();
   });
 });
