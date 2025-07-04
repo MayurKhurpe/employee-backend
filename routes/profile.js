@@ -2,11 +2,11 @@
 const express = require('express');
 const router = express.Router();
 const { protect } = require('../middleware/authMiddleware');
-const nodemailer = require('nodemailer');
-const profileController = require('../controllers/profileController');
+const { getProfile, updateProfile } = require('../controllers/profileController'); // ✅ FIXED
 const AuditLog = require('../models/AuditLog');
 const NotificationSetting = require('../models/NotificationSetting');
 const User = require('../models/User');
+const nodemailer = require('nodemailer');
 require('dotenv').config();
 
 // 📧 Nodemailer Setup
@@ -19,11 +19,11 @@ const transporter = nodemailer.createTransport({
 });
 
 // ✅ GET Logged-in User Profile
-router.get('/', protect, profileController.getProfile);
+router.get('/', protect, getProfile);
 
 // ✅ UPDATE Profile
 router.put('/', protect, async (req, res, next) => {
-  await profileController.updateProfile(req, res, async () => {
+  await updateProfile(req, res, async () => {
     await AuditLog.create({
       user: req.user,
       action: 'Updated Profile',
@@ -31,7 +31,7 @@ router.put('/', protect, async (req, res, next) => {
       ip: req.ip,
     });
 
-    // 📧 Optional Email Notification
+    // ✅ Email Notification (optional)
     const setting = await NotificationSetting.findOne({ userId: req.user.id });
     if (setting?.emailNotif) {
       const user = await User.findById(req.user.id);
@@ -40,12 +40,12 @@ router.put('/', protect, async (req, res, next) => {
           from: process.env.EMAIL_USER,
           to: user.email,
           subject: '📋 Your Profile was Updated',
-          html: `<p>Hello ${user.name},<br>Your profile was successfully updated on ${new Date().toLocaleString()}.</p>`,
+          html: `<p>Hello ${user.name},<br>Your profile was updated on ${new Date().toLocaleString()}.</p>`,
         });
       }
     }
 
-    next();
+    next(); // optional
   });
 });
 
