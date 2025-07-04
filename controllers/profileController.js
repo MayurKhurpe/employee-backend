@@ -1,11 +1,6 @@
 // 📁 controllers/profileController.js
 const User = require('../models/User');
 
-/**
- * @route   GET /api/profile
- * @desc    Fetch logged-in user's profile
- * @access  Private
- */
 const getProfile = async (req, res) => {
   try {
     const user = await User.findById(req.user.userId).select('-password');
@@ -13,16 +8,10 @@ const getProfile = async (req, res) => {
 
     res.status(200).json(user);
   } catch (err) {
-    console.error('❌ Error fetching profile:', err);
     res.status(500).json({ error: 'Error fetching profile' });
   }
 };
 
-/**
- * @route   PUT /api/profile
- * @desc    Update user profile details
- * @access  Private
- */
 const updateProfile = async (req, res) => {
   const {
     name,
@@ -62,12 +51,11 @@ const updateProfile = async (req, res) => {
     const updatedUser = await User.findById(user._id).select('-password');
     res.status(200).json({ message: 'Profile updated successfully', user: updatedUser });
   } catch (err) {
-    console.error('❌ Error updating profile:', err);
     res.status(500).json({ error: 'Error updating profile' });
   }
 };
 
 module.exports = {
   getProfile,
-  updateProfile
+  updateProfile,
 };
