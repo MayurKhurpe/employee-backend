@@ -7,7 +7,7 @@ const User = require('../models/User');
 // const { protect, isAdmin } = require('../middleware/auth');
 
 // ✅ Fixed path:
-const { protect, isAdmin } = require('../middleware/authMiddleware'); // ✏️ Changed this line
+const { protect, isAdmin } = require('../middleware/auth'); // ✏️ Changed this line
 
 // ✅ GET all employees for dropdown
 router.get('/all', protect, isAdmin, async (req, res) => {

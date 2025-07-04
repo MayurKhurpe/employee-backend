@@ -1,6 +1,7 @@
+// 📁 routes/devices.js
 const express = require('express');
 const router = express.Router();
-const authMiddleware = require('../middleware/auth');
+const { protect } = require('../middleware/auth'); // ✅ Updated import
 const NotificationSetting = require('../models/NotificationSetting');
 const nodemailer = require('nodemailer');
 require('dotenv').config();
@@ -21,18 +22,18 @@ let devices = [
 ];
 
 // ✅ GET all linked devices
-router.get('/', authMiddleware, (req, res) => {
+router.get('/', protect, (req, res) => {
   res.json(devices);
 });
 
 // ✅ DELETE (unlink) a device by ID
-router.delete('/:id', authMiddleware, async (req, res) => {
+router.delete('/:id', protect, async (req, res) => {
   const id = parseInt(req.params.id);
   const removedDevice = devices.find(d => d.id === id);
   devices = devices.filter(d => d.id !== id);
 
   // 🔔 Email notification if enabled
-  const notif = await NotificationSetting.findOne({ userId: req.user.id });
+  const notif = await NotificationSetting.findOne({ userId: req.user.userId });
   if (notif?.emailNotif && removedDevice) {
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
