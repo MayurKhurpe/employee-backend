@@ -1,3 +1,4 @@
+// 📁 server.js (final full copy)
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
@@ -54,6 +55,11 @@ mongoose.connect(process.env.MONGO_URI)
 // ✅ Home Route
 app.get('/', (req, res) => {
   res.send('🎉 Employee Management Backend API is running!');
+});
+
+// ✅ PING route (Frontend health check)
+app.get('/api/ping', (req, res) => {
+  res.json({ message: 'pong' });
 });
 
 // 🔐 Login
@@ -197,20 +203,13 @@ app.use('/api/leave', protect, require('./routes/leave'));
 app.use('/api/birthdays', protect, require('./routes/birthday'));
 app.use('/api/news', protect, require('./routes/news'));
 app.use('/api/holidays', protect, require('./routes/holiday'));
-app.use('/api/broadcasts', require('./routes/broadcast'));         // for public fetch
-app.use('/api/admin/broadcasts', require('./routes/broadcast'));   // for admin controls
+app.use('/api/broadcasts', require('./routes/broadcast'));
+app.use('/api/admin/broadcasts', require('./routes/broadcast'));
 app.use('/api/notification-settings', protect, require('./routes/notification'));
 app.use('/api/admin', protect, isAdmin, require('./routes/admin'));
 app.use('/api/events', protect, require('./routes/eventRoutes'));
-
-// ✅ ✅ ✅ ✅ NEW: Change Password Route Added
 app.use('/api/change-password', protect, require('./routes/changePassword'));
-
-// ✅ ✅ ✅ ✅ NEW: USERS DROPDOWN API (REQUIRED FOR FILTER)
-app.use('/api/users', protect, isAdmin, require('./routes/userRoutes')); // <-- ✅ added this line
-
-// ✅ ✅ ✅ ✅ ADD THIS NEW PING ROUTE BELOW
-app.use('/api', require('./routes/ping'));
+app.use('/api/users', protect, isAdmin, require('./routes/userRoutes'));
 
 // ⏰ Daily Background Jobs
 require('./scheduler');

@@ -1,7 +1,13 @@
+// 📁 routes/userRoutes.js (or your filename)
 const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
-const { protect, isAdmin } = require('../middleware/auth');
+
+// ❌ Wrong path (causes middleware issues):
+// const { protect, isAdmin } = require('../middleware/auth');
+
+// ✅ Fixed path:
+const { protect, isAdmin } = require('../middleware/authMiddleware'); // ✏️ Changed this line
 
 // ✅ GET all employees for dropdown
 router.get('/all', protect, isAdmin, async (req, res) => {
