@@ -8,7 +8,7 @@ const path = require('path');
  * @desc    Fetch logged-in user's profile
  * @access  Private
  */
-exports.getProfile = async (req, res) => {
+const getProfile = async (req, res) => {
   try {
     const user = await User.findById(req.user.userId).select('-password');
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -25,7 +25,7 @@ exports.getProfile = async (req, res) => {
  * @desc    Update user profile details
  * @access  Private
  */
-exports.updateProfile = async (req, res) => {
+const updateProfile = async (req, res) => {
   const {
     name,
     email,
@@ -42,7 +42,6 @@ exports.updateProfile = async (req, res) => {
     const user = await User.findById(req.user.userId);
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    // ✅ Email update with duplicate check
     if (email && email !== user.email) {
       const emailExists = await User.findOne({ email });
       if (emailExists) {
@@ -51,7 +50,6 @@ exports.updateProfile = async (req, res) => {
       user.email = email;
     }
 
-    // ✅ Update profile fields
     user.name = name || user.name;
     user.address = address || user.address;
     user.mobile = mobile || user.mobile;
@@ -59,7 +57,7 @@ exports.updateProfile = async (req, res) => {
     user.bloodGroup = bloodGroup || user.bloodGroup;
     user.department = department || user.department;
     user.joiningDate = joiningDate || user.joiningDate;
-    user.dob = dob || user.dob; // ✅ Save dob
+    user.dob = dob || user.dob;
 
     await user.save();
 
@@ -76,7 +74,7 @@ exports.updateProfile = async (req, res) => {
  * @desc    Upload or update profile picture
  * @access  Private
  */
-exports.uploadProfilePicture = async (req, res) => {
+const uploadProfilePicture = async (req, res) => {
   try {
     const user = await User.findById(req.user.userId);
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -98,4 +96,10 @@ exports.uploadProfilePicture = async (req, res) => {
     console.error('❌ Upload failed:', err);
     res.status(500).json({ error: 'Profile picture upload failed' });
   }
+};
+
+module.exports = {
+  getProfile,
+  updateProfile,
+  uploadProfilePicture,
 };

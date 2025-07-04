@@ -1,14 +1,19 @@
-// 📁 routes/profile.js
 const express = require('express');
 const router = express.Router();
 const { protect } = require('../middleware/authMiddleware');
 const multer = require('multer');
 const nodemailer = require('nodemailer');
-const profileController = require('../controllers/profileController');
 const AuditLog = require('../models/AuditLog');
 const NotificationSetting = require('../models/NotificationSetting');
 const User = require('../models/User');
 require('dotenv').config();
+
+// ✅ Destructured controller imports
+const {
+  getProfile,
+  updateProfile,
+  uploadProfilePicture,
+} = require('../controllers/profileController');
 
 // 📂 Multer Storage Config
 const storage = multer.diskStorage({
@@ -27,11 +32,11 @@ const transporter = nodemailer.createTransport({
 });
 
 // ✅ GET Logged-in User Profile
-router.get('/', protect, profileController.getProfile);
+router.get('/', protect, getProfile);
 
 // ✅ UPDATE Profile
 router.put('/', protect, async (req, res, next) => {
-  await profileController.updateProfile(req, res, async () => {
+  await updateProfile(req, res, async () => {
     await AuditLog.create({
       user: req.user,
       action: 'Updated Profile',
@@ -39,10 +44,9 @@ router.put('/', protect, async (req, res, next) => {
       ip: req.ip,
     });
 
-    // 📧 Optional Email Notification
-    const setting = await NotificationSetting.findOne({ userId: req.user.id });
+    const setting = await NotificationSetting.findOne({ userId: req.user.userId });
     if (setting?.emailNotif) {
-      const user = await User.findById(req.user.id);
+      const user = await User.findById(req.user.userId);
       if (user) {
         await transporter.sendMail({
           from: process.env.EMAIL_USER,
@@ -59,7 +63,7 @@ router.put('/', protect, async (req, res, next) => {
 
 // ✅ UPLOAD Profile Picture
 router.post('/upload', protect, upload.single('profileImage'), async (req, res, next) => {
-  await profileController.uploadProfilePicture(req, res, async () => {
+  await uploadProfilePicture(req, res, async () => {
     await AuditLog.create({
       user: req.user,
       action: 'Uploaded Profile Picture',
