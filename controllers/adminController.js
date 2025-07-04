@@ -48,7 +48,7 @@ exports.approveUser = async (req, res) => {
         html: `
           <h2>Welcome, ${user.name}!</h2>
           <p>Your account has been <strong style="color:green;">approved</strong> by the admin team. You can now log in and start using the Employee Management System.</p>
-          <p><a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}">Click here to login</a></p>
+          <p><a href="${process.env.FRONTEND_URL || 'https://employee-web-brown.vercel.app'}">Click here to login</a></p>
         `,
       });
     }

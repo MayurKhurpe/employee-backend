@@ -15,7 +15,7 @@ const { protect, isAdmin } = require('./middleware/auth');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const FRONTEND_URL = process.env.FRONTEND_URL || 'https://employee-web-mu.vercel.app';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'https://employee-web-brown.vercel.app';
 
 // ✅ CORS Setup
 const corsOptions = {
@@ -23,7 +23,7 @@ const corsOptions = {
     const allowedOrigins = [
       'http://localhost:3000',
       'https://employee-web-kifp.onrender.com',
-      'https://employee-web-mu.vercel.app',
+      'https://employee-web-brown.vercel.app',
     ];
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
