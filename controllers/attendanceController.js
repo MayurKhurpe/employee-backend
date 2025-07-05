@@ -18,7 +18,7 @@ const getStartOfDay = (date) => {
   return d;
 };
 
-// ✅ Distance Check (within 0.5km)
+// ✅ Distance Check (within 1 km)
 function isWithinOffice(lat, lng) {
   const officeLat = 18.5204;
   const officeLng = 73.8567;
@@ -38,7 +38,15 @@ function isWithinOffice(lat, lng) {
 // ✅ Mark Attendance
 exports.markAttendance = async (req, res) => {
   try {
-    const userId = req.user.userId;
+    console.log('✅ markAttendance triggered');
+    console.log('req.user:', req.user);
+    console.log('req.body:', req.body);
+
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ message: 'Unauthorized: Missing userId' });
+    }
+
     const {
       status = 'Present',
       location = null,
@@ -50,21 +58,24 @@ exports.markAttendance = async (req, res) => {
 
     const today = getStartOfDay(new Date());
 
-    if (await Attendance.findOne({ userId, date: today })) {
+    const alreadyMarked = await Attendance.findOne({ userId, date: today });
+    if (alreadyMarked) {
       return res.status(400).json({ message: 'Attendance already marked for today.' });
     }
 
     const user = await User.findById(userId);
-    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
 
-    // ✅ Remote Work required fields
+    // ✅ Validate Remote Work
     if (status === 'Remote Work') {
       if (!customer || !workLocation || !assignedBy) {
         return res.status(400).json({ message: 'All remote work fields are required.' });
       }
     }
 
-    // ✅ Location check for Present & Half Day
+    // ✅ Check if location is outside
     let outsideLocation = false;
     if (['Present', 'Half Day'].includes(status)) {
       if (
@@ -94,27 +105,32 @@ exports.markAttendance = async (req, res) => {
 
     await newAttendance.save();
 
-    // ✅ Notify Admin if Present/HalfDay is marked from outside location
+    // ✅ Notify Admin if outside office
     if (['Present', 'Half Day'].includes(status) && outsideLocation) {
-      await transporter.sendMail({
-        from: process.env.EMAIL_USER,
-        to: 'hr.seekersautomation@gmail.com',
-        subject: `📍 Attendance Location Issue - ${user.name}`,
-        html: `
-          <p><strong>${user.name}</strong> marked <strong>${status}</strong> but location is not within office boundary.</p>
-          <p><strong>Date:</strong> ${today.toDateString()}</p>
-          <p><strong>In-Time:</strong> ${checkInTime || '—'}</p>
-          <p><strong>Email:</strong> ${user.email}</p>
-          <p><strong>Location:</strong> ${location ? `Lat: ${location.lat}, Lng: ${location.lng}` : 'Not available'}</p>
-        `,
-      });
+      try {
+        await transporter.sendMail({
+          from: process.env.EMAIL_USER,
+          to: 'hr.seekersautomation@gmail.com',
+          subject: `📍 Attendance Location Issue - ${user.name}`,
+          html: `
+            <p><strong>${user.name}</strong> marked <strong>${status}</strong> but location is not within office boundary.</p>
+            <p><strong>Date:</strong> ${today.toDateString()}</p>
+            <p><strong>In-Time:</strong> ${checkInTime || '—'}</p>
+            <p><strong>Email:</strong> ${user.email}</p>
+            <p><strong>Location:</strong> ${
+              location ? `Lat: ${location.lat}, Lng: ${location.lng}` : 'Not available'
+            }</p>
+          `,
+        });
+      } catch (emailError) {
+        console.error('❌ Failed to send email:', emailError);
+      }
     }
 
     res.status(201).json({
       message: 'Attendance marked successfully.',
       attendance: newAttendance.toObject(),
     });
-
   } catch (err) {
     console.error('❌ Attendance Marking Failed:', err);
     res.status(500).json({ message: 'Error marking attendance.', error: err.message });
@@ -232,7 +248,9 @@ exports.updateCheckout = async (req, res) => {
 // ✅ Summary
 exports.getSummary = async (req, res) => {
   try {
-    const queryDate = req.query.date ? getStartOfDay(new Date(req.query.date)) : getStartOfDay(new Date());
+    const queryDate = req.query.date
+      ? getStartOfDay(new Date(req.query.date))
+      : getStartOfDay(new Date());
     const allUsers = await User.find({ role: 'employee' });
     const todayRecords = await Attendance.find({ date: queryDate });
 
