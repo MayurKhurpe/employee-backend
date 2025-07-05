@@ -16,7 +16,18 @@ router.use(protect, isAdmin);
 // ✅ USER MANAGEMENT
 // =========================
 
-// 👥 Get all users pending approval or verification
+// 📌 New: Get all users (for full user list with stats)
+router.get('/all-users', async (req, res) => {
+  try {
+    const users = await User.find().select('name email role isApproved isVerified');
+    res.json(users);
+  } catch (err) {
+    console.error('❌ Error fetching all users:', err);
+    res.status(500).json({ error: 'Failed to fetch all users' });
+  }
+});
+
+// 🔽 Existing Routes
 router.get('/pending-users', async (req, res) => {
   try {
     const users = await User.find({
@@ -30,7 +41,6 @@ router.get('/pending-users', async (req, res) => {
   }
 });
 
-// ✅ Approve a user by email (sets both approved and verified)
 router.post('/approve-user', async (req, res) => {
   try {
     const { email } = req.body;
@@ -40,9 +50,7 @@ router.post('/approve-user', async (req, res) => {
       { new: true }
     );
 
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
+    if (!user) return res.status(404).json({ error: 'User not found' });
 
     res.json({ message: 'User approved successfully' });
   } catch (err) {
@@ -51,7 +59,6 @@ router.post('/approve-user', async (req, res) => {
   }
 });
 
-// ✅ Verify a user by email (sets only verified)
 router.post('/verify-user', async (req, res) => {
   try {
     const { email } = req.body;
@@ -61,9 +68,7 @@ router.post('/verify-user', async (req, res) => {
       { new: true }
     );
 
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
+    if (!user) return res.status(404).json({ error: 'User not found' });
 
     res.json({ message: 'User verified successfully' });
   } catch (err) {
@@ -72,15 +77,12 @@ router.post('/verify-user', async (req, res) => {
   }
 });
 
-// ❌ Reject/delete a user by email (fallback - unused)
 router.post('/reject-user', async (req, res) => {
   try {
     const { email } = req.body;
     const deleted = await User.findOneAndDelete({ email });
 
-    if (!deleted) {
-      return res.status(404).json({ error: 'User not found' });
-    }
+    if (!deleted) return res.status(404).json({ error: 'User not found' });
 
     res.json({ message: 'User rejected and deleted' });
   } catch (err) {
@@ -89,15 +91,12 @@ router.post('/reject-user', async (req, res) => {
   }
 });
 
-// ❌ DELETE a user by email (used in frontend DataGrid)
 router.delete('/delete-user', async (req, res) => {
   try {
     const { email } = req.body;
     const user = await User.findOneAndDelete({ email });
 
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
+    if (!user) return res.status(404).json({ error: 'User not found' });
 
     res.json({ message: 'User deleted successfully' });
   } catch (err) {
@@ -106,7 +105,6 @@ router.delete('/delete-user', async (req, res) => {
   }
 });
 
-// 📤 Export all approved users to CSV
 router.get('/export-users', async (req, res) => {
   try {
     const users = await User.find({ isApproved: true }).select('name email role');
