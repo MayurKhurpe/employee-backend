@@ -75,7 +75,7 @@ exports.markAttendance = async (req, res) => {
       }
     }
 
-    // ✅ Check if location is outside
+    // ✅ Check if location is outside office (but allow marking)
     let outsideLocation = false;
     if (['Present', 'Half Day'].includes(status)) {
       if (
@@ -97,9 +97,7 @@ exports.markAttendance = async (req, res) => {
       date: today,
       status,
       checkInTime,
-      location: location
-        ? `${location.lat},${location.lng}`
-        : undefined,
+      location: location ? `${location.lat},${location.lng}` : undefined,
       customer,
       workLocation,
       assignedBy,
@@ -107,25 +105,25 @@ exports.markAttendance = async (req, res) => {
 
     await newAttendance.save();
 
-    // ✅ Notify Admin if outside office
+    // ✅ Send email to admin if Present/Half Day marked outside location
     if (['Present', 'Half Day'].includes(status) && outsideLocation) {
       try {
         await transporter.sendMail({
           from: process.env.EMAIL_USER,
           to: 'hr.seekersautomation@gmail.com',
-          subject: `📍 Attendance Location Issue - ${user.name}`,
+          subject: `⚠ Outside Attendance Alert - ${user.name}`,
           html: `
-            <p><strong>${user.name}</strong> marked <strong>${status}</strong> but location is not within office boundary.</p>
+            <h3>⚠ ${user.name} marked ${status} outside office location</h3>
             <p><strong>Date:</strong> ${today.toDateString()}</p>
-            <p><strong>In-Time:</strong> ${checkInTime || '—'}</p>
             <p><strong>Email:</strong> ${user.email}</p>
+            <p><strong>Check-in Time:</strong> ${checkInTime || '—'}</p>
             <p><strong>Location:</strong> ${
-              location ? `Lat: ${location.lat}, Lng: ${location.lng}` : 'Not available'
+              location ? `Lat: ${location.lat}, Lng: ${location.lng}` : 'Not Available'
             }</p>
           `,
         });
-      } catch (emailError) {
-        console.error('❌ Failed to send email:', emailError);
+      } catch (emailErr) {
+        console.error('❌ Failed to send email:', emailErr);
       }
     }
 
@@ -138,7 +136,6 @@ exports.markAttendance = async (req, res) => {
     res.status(500).json({ message: 'Error marking attendance.', error: err.message });
   }
 };
-
 // ✅ Get My Attendance
 exports.getMyAttendance = async (req, res) => {
   try {
