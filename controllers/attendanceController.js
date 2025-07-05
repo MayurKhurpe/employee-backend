@@ -98,8 +98,8 @@ exports.markAttendance = async (req, res) => {
       status,
       checkInTime,
       location: location
-  ? `${location.lat},${location.lng}`
-  : undefined,
+        ? `${location.lat},${location.lng}`
+        : undefined,
       customer,
       workLocation,
       assignedBy,
@@ -143,12 +143,29 @@ exports.markAttendance = async (req, res) => {
 exports.getMyAttendance = async (req, res) => {
   try {
     const userId = req.user.userId;
+
+    // ✅ Fetch all attendance records including Remote Work fields
     const records = await Attendance.find({ userId }).sort({ date: -1 });
-    res.json(records);
+
+    res.json(records.map((r) => ({
+      _id: r._id,
+      userId: r.userId,
+      name: r.name,
+      email: r.email,
+      date: r.date,
+      status: r.status,
+      checkInTime: r.checkInTime || '',
+      checkOutTime: r.checkOutTime || '',
+      location: r.location || '',
+      customer: r.customer || '',
+      workLocation: r.workLocation || '',
+      assignedBy: r.assignedBy || '',
+    })));
   } catch (err) {
     res.status(500).json({ message: 'Error fetching attendance.', error: err.message });
   }
 };
+
 
 // ✅ Admin: Get All Attendance
 exports.getAllAttendance = async (req, res) => {
