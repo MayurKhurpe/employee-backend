@@ -19,6 +19,11 @@ const eventSchema = new mongoose.Schema({
     type: Date,
     required: true,
   },
+  expiresAt: {
+    type: Date,
+    required: true,
+    index: { expires: 0 }, // TTL index: auto delete at this datetime
+  },
 }, { timestamps: true });
 
 module.exports = mongoose.model('Event', eventSchema);

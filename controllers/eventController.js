@@ -1,4 +1,3 @@
-// controllers/eventController.js
 const Event = require('../models/Event');
 
 // 📌 Add or Edit Event
@@ -7,17 +6,20 @@ exports.saveEvent = async (req, res) => {
   const userId = req.user.userId;
 
   try {
+    const eventDate = new Date(date);
+    const expiresAt = new Date(eventDate.getTime() + 24 * 60 * 60 * 1000); // +1 day
+
     let event;
     if (id) {
       // Edit existing
       event = await Event.findOneAndUpdate(
         { _id: id, userId },
-        { title, category, date },
+        { title, category, date: eventDate, expiresAt },
         { new: true }
       );
     } else {
       // Create new
-      event = await Event.create({ userId, title, category, date });
+      event = await Event.create({ userId, title, category, date: eventDate, expiresAt });
     }
     res.json(event);
   } catch (err) {
