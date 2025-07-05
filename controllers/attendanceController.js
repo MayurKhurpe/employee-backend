@@ -1,3 +1,4 @@
+// ✅ Required Modules
 const Attendance = require('../models/attendanceModel');
 const User = require('../models/User');
 const nodemailer = require('nodemailer');
@@ -38,14 +39,8 @@ function isWithinOffice(lat, lng) {
 // ✅ Mark Attendance
 exports.markAttendance = async (req, res) => {
   try {
-    console.log('✅ markAttendance triggered');
-    console.log('req.user:', req.user);
-    console.log('req.body:', req.body);
-
     const userId = req.user?.userId;
-    if (!userId) {
-      return res.status(401).json({ message: 'Unauthorized: Missing userId' });
-    }
+    if (!userId) return res.status(401).json({ message: 'Unauthorized: Missing userId' });
 
     const {
       status = 'Present',
@@ -59,30 +54,18 @@ exports.markAttendance = async (req, res) => {
     const today = getStartOfDay(new Date());
 
     const alreadyMarked = await Attendance.findOne({ userId, date: today });
-    if (alreadyMarked) {
-      return res.status(400).json({ message: 'Attendance already marked for today.' });
-    }
+    if (alreadyMarked) return res.status(400).json({ message: 'Attendance already marked for today.' });
 
     const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    if (status === 'Remote Work' && (!customer || !workLocation || !assignedBy)) {
+      return res.status(400).json({ message: 'All remote work fields are required.' });
     }
 
-    // ✅ Validate Remote Work
-    if (status === 'Remote Work') {
-      if (!customer || !workLocation || !assignedBy) {
-        return res.status(400).json({ message: 'All remote work fields are required.' });
-      }
-    }
-
-    // ✅ Check if location is outside office (but allow marking)
     let outsideLocation = false;
     if (['Present', 'Half Day'].includes(status)) {
-      if (
-        !location ||
-        typeof location.lat !== 'number' ||
-        typeof location.lng !== 'number'
-      ) {
+      if (!location || typeof location.lat !== 'number' || typeof location.lng !== 'number') {
         outsideLocation = true;
       } else {
         const isInside = isWithinOffice(location.lat, location.lng);
@@ -105,7 +88,7 @@ exports.markAttendance = async (req, res) => {
 
     await newAttendance.save();
 
-    // ✅ Send email to admin if Present/Half Day marked outside location
+    // ✅ Email to admin if outside
     if (['Present', 'Half Day'].includes(status) && outsideLocation) {
       try {
         await transporter.sendMail({
@@ -117,20 +100,41 @@ exports.markAttendance = async (req, res) => {
             <p><strong>Date:</strong> ${today.toDateString()}</p>
             <p><strong>Email:</strong> ${user.email}</p>
             <p><strong>Check-in Time:</strong> ${checkInTime || '—'}</p>
-            <p><strong>Location:</strong> ${
-              location ? `Lat: ${location.lat}, Lng: ${location.lng}` : 'Not Available'
-            }</p>
+            <p><strong>Location:</strong> ${location ? `Lat: ${location.lat}, Lng: ${location.lng}` : 'Not Available'}</p>
           `,
         });
-      } catch (emailErr) {
-        console.error('❌ Failed to send email:', emailErr);
+      } catch (err) {
+        console.error('❌ Failed to notify admin:', err);
       }
     }
 
-    res.status(201).json({
-      message: 'Attendance marked successfully.',
-      attendance: newAttendance.toObject(),
+    // ✅ Email to employee
+    const fullDateStr = today.toLocaleDateString('en-GB', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' });
+    const displayDate = `${today.getDate()} ${today.toLocaleString('default', { month: 'long' })} ${today.getFullYear()}`;
+
+    let body = '';
+    if (status === 'Remote Work') {
+      body = `Hi ${user.name}, your attendance has been marked as Remote Work for ${displayDate}.<br><br>
+        📌 <strong>Status:</strong> Remote Work<br><br>
+        👤 <strong>Customer:</strong> ${customer}<br>
+        🏢 <strong>Location:</strong> ${workLocation}<br>
+        📨 <strong>Assigned By:</strong> ${assignedBy}<br><br>
+        🕒 <strong>In:</strong> ${checkInTime || 'N/A'} | <strong>Out:</strong> N/A`;
+    } else {
+      body = `Hi ${user.name}, your attendance has been marked as ${status} for ${displayDate}.<br>
+        ${fullDateStr}<br><br>
+        📌 <strong>Status:</strong> ${status}<br><br>
+        🕒 <strong>In:</strong> N/A | <strong>Out:</strong> N/A`;
+    }
+
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: user.email,
+      subject: `📝 Attendance Marked - ${status}`,
+      html: body,
     });
+
+    res.status(201).json({ message: 'Attendance marked successfully.', attendance: newAttendance });
   } catch (err) {
     console.error('❌ Attendance Marking Failed:', err);
     res.status(500).json({ message: 'Error marking attendance.', error: err.message });
