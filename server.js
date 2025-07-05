@@ -62,6 +62,8 @@ app.use('/api/notification-settings', protect, require('./routes/notification'))
 app.use('/api/admin', protect, isAdmin, require('./routes/admin'));
 app.use('/api/events', protect, require('./routes/eventRoutes'));
 app.use('/api/users', protect, isAdmin, require('./routes/userRoutes'));
+app.use('/api/change-password', protect, require('./routes/changePassword'));
+
 
 // ✅ MongoDB
 mongoose.connect(process.env.MONGO_URI)
