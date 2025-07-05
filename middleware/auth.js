@@ -1,10 +1,7 @@
-// 📁 middleware/auth.js
 const jwt = require("jsonwebtoken");
-const User = require("../models/User"); // ✅ make sure this is imported
+const User = require("../models/User");
+const { jwtSecret } = require("../config"); // ✅ Use the correct secret
 
-/**
- * Middleware to verify JWT and extract full user data
- */
 const protect = async (req, res, next) => {
   const authHeader = req.header("Authorization");
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -14,10 +11,8 @@ const protect = async (req, res, next) => {
   const token = authHeader.split(" ")[1];
 
   try {
-    const secret = process.env.JWT_SECRET || "your_jwt_secret";
-    const decoded = jwt.verify(token, secret);
+    const decoded = jwt.verify(token, jwtSecret); // ✅ Now uses the correct secret
 
-    // ✅ Fetch full user info (name, email, role, etc.)
     const user = await User.findById(decoded.userId).select("name email role");
 
     if (!user) {
@@ -38,9 +33,6 @@ const protect = async (req, res, next) => {
   }
 };
 
-/**
- * Middleware to allow only admins
- */
 const isAdmin = (req, res, next) => {
   if (req.user && req.user.role === "admin") {
     next();

@@ -73,7 +73,7 @@ exports.verifyEmail = async (req, res) => {
   }
 };
 
-// ✅ Login
+// ✅ Login (Fixed Version)
 exports.login = async (req, res) => {
   try {
     const { email: rawEmail, password } = req.body;
@@ -87,7 +87,8 @@ exports.login = async (req, res) => {
 
     if (!user.isVerified) return res.status(403).json({ error: 'Please verify your email first' });
 
-    const token = jwt.sign({ id: user._id, role: user.role }, jwtSecret, { expiresIn: '2h' });
+    // ✅ Fixed: payload uses userId (not id)
+    const token = jwt.sign({ userId: user._id, role: user.role }, jwtSecret, { expiresIn: '2h' });
 
     res.json({
       token,

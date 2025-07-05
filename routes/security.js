@@ -4,7 +4,8 @@ const jwt = require('jsonwebtoken');
 const SecurityLog = require('../models/SecurityLog');
 
 // Middleware to authenticate and extract user ID
-const auth = (req, res, next) => {
+const { protect } = require('../middleware/auth'); 
+{
   const authHeader = req.headers.authorization;
   if (!authHeader) return res.status(401).json({ error: 'Unauthorized: No token provided' });
 
