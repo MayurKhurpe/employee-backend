@@ -203,6 +203,7 @@ app.use('/api/leave', protect, require('./routes/leave'));
 app.use('/api/birthdays', protect, require('./routes/birthday'));
 app.use('/api/news', protect, require('./routes/news'));
 app.use('/api/holidays', protect, require('./routes/holiday'));
+app.use('/api/admin/holidays', protect, isAdmin, require('./routes/holiday'));
 app.use('/api/broadcasts', require('./routes/broadcast'));
 app.use('/api/admin/broadcasts', require('./routes/broadcast'));
 app.use('/api/notification-settings', protect, require('./routes/notification'));
