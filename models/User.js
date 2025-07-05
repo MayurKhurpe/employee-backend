@@ -1,4 +1,3 @@
-// 📁 models/User.js
 const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema(
@@ -29,6 +28,28 @@ const userSchema = new mongoose.Schema(
       trim: true,
     },
 
+    emergencyMobile: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+
+    bloodGroup: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+
+    joiningDate: {
+      type: Date,
+      default: null,
+    },
+
+    dob: {
+      type: Date,
+      default: null,
+    },
+
     department: {
       type: String,
       default: '',
@@ -57,25 +78,24 @@ const userSchema = new mongoose.Schema(
       default: Date.now,
     },
 
-    // ✅ Email verification
     isVerified: {
       type: Boolean,
       default: false,
     },
+
     verificationToken: {
       type: String,
     },
 
-    // ✅ Reset password support
     resetToken: {
       type: String,
     },
+
     resetTokenExpires: {
       type: Date,
       default: null,
     },
 
-    // ✅ Profile image support
     profileImage: {
       type: String,
       default: '',
