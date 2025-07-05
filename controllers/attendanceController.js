@@ -97,7 +97,9 @@ exports.markAttendance = async (req, res) => {
       date: today,
       status,
       checkInTime,
-      location: location || undefined,
+      location: location
+  ? `${location.lat},${location.lng}`
+  : undefined,
       customer,
       workLocation,
       assignedBy,
