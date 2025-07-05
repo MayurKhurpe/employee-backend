@@ -1,4 +1,4 @@
-// 📁 server.js (final full copy)
+// 📁 server.js (Final Corrected)
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
@@ -45,7 +45,23 @@ app.options('*', cors(corsOptions));
 app.use(express.json());
 app.use(helmet());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-app.use('/api', require('./routes/auth'));
+
+// ✅ Routes
+app.use('/api', require('./routes/auth')); // Includes /change-password
+app.use('/api/profile', protect, require('./routes/profile'));
+app.use('/api/attendance', protect, require('./routes/attendance'));
+app.use('/api/attendance-stats', protect, require('./routes/attendanceStats'));
+app.use('/api/leave', protect, require('./routes/leave'));
+app.use('/api/birthdays', protect, require('./routes/birthday'));
+app.use('/api/news', protect, require('./routes/news'));
+app.use('/api/holidays', protect, require('./routes/holiday'));
+app.use('/api/admin/holidays', protect, isAdmin, require('./routes/holiday'));
+app.use('/api/broadcasts', require('./routes/broadcast'));
+app.use('/api/admin/broadcasts', require('./routes/broadcast'));
+app.use('/api/notification-settings', protect, require('./routes/notification'));
+app.use('/api/admin', protect, isAdmin, require('./routes/admin'));
+app.use('/api/events', protect, require('./routes/eventRoutes'));
+app.use('/api/users', protect, isAdmin, require('./routes/userRoutes'));
 
 // ✅ MongoDB
 mongoose.connect(process.env.MONGO_URI)
@@ -194,24 +210,6 @@ app.post('/api/approve-user', protect, isAdmin, async (req, res) => {
     res.status(500).json({ error: 'Failed to approve user' });
   }
 });
-
-// ✅ Routes
-app.use('/api/profile', protect, require('./routes/profile'));
-app.use('/api/attendance', protect, require('./routes/attendance'));
-app.use('/api/attendance-stats', protect, require('./routes/attendanceStats'));
-app.use('/api/leave', protect, require('./routes/leave'));
-app.use('/api/birthdays', protect, require('./routes/birthday'));
-app.use('/api/news', protect, require('./routes/news'));
-app.use('/api/holidays', protect, require('./routes/holiday'));
-app.use('/api/admin/holidays', protect, isAdmin, require('./routes/holiday'));
-app.use('/api/broadcasts', require('./routes/broadcast'));
-app.use('/api/admin/broadcasts', require('./routes/broadcast'));
-app.use('/api/notification-settings', protect, require('./routes/notification'));
-app.use('/api/admin', protect, isAdmin, require('./routes/admin'));
-app.use('/api/events', protect, require('./routes/eventRoutes'));
-app.use('/api/change-password', protect, require('./routes/changePassword'));
-app.use('/api/users', protect, isAdmin, require('./routes/userRoutes'));
-
 
 // ⏰ Daily Background Jobs
 require('./scheduler');
