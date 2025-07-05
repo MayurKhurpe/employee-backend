@@ -3,7 +3,7 @@ const User = require('../models/User');
 const nodemailer = require('nodemailer');
 require('dotenv').config();
 
-// Email transporter setup
+// ✅ Email transporter
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
@@ -17,6 +17,23 @@ const getStartOfDay = (date) => {
   d.setHours(0, 0, 0, 0);
   return d;
 };
+
+// ✅ Distance Check (within 0.5km)
+function isWithinOffice(lat, lng) {
+  const officeLat = 18.5204;
+  const officeLng = 73.8567;
+  const R = 6371;
+  const toRad = (val) => (val * Math.PI) / 180;
+
+  const dLat = toRad(officeLat - lat);
+  const dLng = toRad(officeLng - lng);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat)) * Math.cos(toRad(officeLat)) * Math.sin(dLng / 2) ** 2;
+
+  const distance = 2 * R * Math.asin(Math.sqrt(a));
+  return distance <= 1;
+}
 
 // ✅ Mark Attendance
 exports.markAttendance = async (req, res) => {
@@ -40,6 +57,28 @@ exports.markAttendance = async (req, res) => {
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
+    // ✅ Remote Work required fields
+    if (status === 'Remote Work') {
+      if (!customer || !workLocation || !assignedBy) {
+        return res.status(400).json({ message: 'All remote work fields are required.' });
+      }
+    }
+
+    // ✅ Location check for Present & Half Day
+    let outsideLocation = false;
+    if (['Present', 'Half Day'].includes(status)) {
+      if (
+        !location ||
+        typeof location.lat !== 'number' ||
+        typeof location.lng !== 'number'
+      ) {
+        outsideLocation = true;
+      } else {
+        const isInside = isWithinOffice(location.lat, location.lng);
+        outsideLocation = !isInside;
+      }
+    }
+
     const newAttendance = new Attendance({
       userId,
       name: user.name,
@@ -47,43 +86,26 @@ exports.markAttendance = async (req, res) => {
       date: today,
       status,
       checkInTime,
+      location: location || undefined,
+      customer,
+      workLocation,
+      assignedBy,
     });
-
-    if (status === 'Remote Work') {
-      if (!customer || !workLocation || !assignedBy) {
-        return res.status(400).json({ message: 'All remote work fields are required.' });
-      }
-      newAttendance.customer = customer;
-      newAttendance.workLocation = workLocation;
-      newAttendance.assignedBy = assignedBy;
-    }
-
-    if (['Present', 'Absent', 'Half Day'].includes(status)) {
-  if (
-    typeof location === 'object' &&
-    typeof location.lat === 'number' &&
-    typeof location.lng === 'number'
-  ) {
-    newAttendance.location = {
-      lat: location.lat,
-      lng: location.lng,
-    };
-  } else {
-    return res.status(400).json({ message: 'Location (lat,lng) is required and must be numbers.' });
-  }
-}
 
     await newAttendance.save();
 
-    if (status === 'Absent') {
+    // ✅ Notify Admin if Present/HalfDay is marked from outside location
+    if (['Present', 'Half Day'].includes(status) && outsideLocation) {
       await transporter.sendMail({
         from: process.env.EMAIL_USER,
-        to: 'manager@yourcompany.com',
-        subject: `❌ Absence Alert - ${user.name}`,
+        to: 'hr.seekersautomation@gmail.com',
+        subject: `📍 Attendance Location Issue - ${user.name}`,
         html: `
-          <p><strong>${user.name}</strong> was marked <strong>Absent</strong> today.</p>
+          <p><strong>${user.name}</strong> marked <strong>${status}</strong> but location is not within office boundary.</p>
+          <p><strong>Date:</strong> ${today.toDateString()}</p>
+          <p><strong>In-Time:</strong> ${checkInTime || '—'}</p>
           <p><strong>Email:</strong> ${user.email}</p>
-          <p><strong>Date:</strong> ${today.toLocaleDateString()}</p>
+          <p><strong>Location:</strong> ${location ? `Lat: ${location.lat}, Lng: ${location.lng}` : 'Not available'}</p>
         `,
       });
     }
@@ -99,7 +121,7 @@ exports.markAttendance = async (req, res) => {
   }
 };
 
-// ✅ Get My Attendance Records
+// ✅ Get My Attendance
 exports.getMyAttendance = async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -110,56 +132,40 @@ exports.getMyAttendance = async (req, res) => {
   }
 };
 
-// ✅ Get All Attendance (Admin) with month/user filters
+// ✅ Admin: Get All Attendance
 exports.getAllAttendance = async (req, res) => {
   try {
     const { page = 1, limit = 10, date, month, userId } = req.query;
-
-    // Prepare date filter
-    let queryDate = null;
-    if (date) queryDate = getStartOfDay(new Date(date));
-
-    // Get all employees
+    let queryDate = date ? getStartOfDay(new Date(date)) : null;
     const users = await User.find({ role: 'employee' }).select('_id name email');
 
-    // Apply month or date filter
-    let attendanceFilter = {};
-    if (queryDate) {
-      attendanceFilter.date = queryDate;
-    } else if (month) {
+    let filter = {};
+    if (queryDate) filter.date = queryDate;
+    else if (month) {
       const [y, m] = month.split('-').map(Number);
       const start = new Date(y, m - 1, 1);
       const end = new Date(y, m, 0, 23, 59, 59, 999);
-      attendanceFilter.date = { $gte: start, $lte: end };
+      filter.date = { $gte: start, $lte: end };
     }
+    if (userId) filter.userId = userId;
 
-    if (userId) {
-      attendanceFilter.userId = userId;
-    }
+    const marked = await Attendance.find(filter);
+    const map = new Map();
+    marked.forEach((r) => map.set(r.userId.toString() + r.date?.toISOString(), r));
 
-    const markedRecords = await Attendance.find(attendanceFilter);
-
-    // Map userId => attendance record
-    const attendanceMap = new Map();
-    markedRecords.forEach((rec) => {
-      attendanceMap.set(rec.userId.toString() + rec.date?.toISOString(), rec);
-    });
-
-    // Filter users if specific userId
     const filteredUsers = userId
       ? users.filter((u) => u._id.toString() === userId)
       : users;
 
-    let fullRecords = [];
+    let all = [];
 
     if (queryDate || userId || month) {
-      // One record per user (specific date or month)
-      fullRecords = filteredUsers.map((user) => {
+      all = filteredUsers.map((user) => {
         const key = month
-          ? null // for month, we allow multiple
+          ? null
           : userId
-          ? markedRecords.find((r) => r.userId.toString() === user._id.toString())
-          : attendanceMap.get(user._id.toString() + queryDate?.toISOString());
+          ? marked.find((r) => r.userId.toString() === user._id.toString())
+          : map.get(user._id.toString() + queryDate?.toISOString());
 
         return key || {
           _id: 'not-marked-' + user._id,
@@ -177,28 +183,23 @@ exports.getAllAttendance = async (req, res) => {
         };
       });
 
-      // If month is used, return all found for that user/month (not placeholder)
       if (month) {
-        fullRecords = markedRecords.map((rec) => rec.toObject());
+        all = marked.map((rec) => rec.toObject());
       }
     }
 
-    // Sort and paginate
-    const sorted = fullRecords.sort((a, b) => new Date(b.date) - new Date(a.date));
+    const sorted = all.sort((a, b) => new Date(b.date) - new Date(a.date));
     const start = (page - 1) * limit;
     const paginated = sorted.slice(start, start + Number(limit));
-    const totalPages = Math.ceil(fullRecords.length / limit);
+    const totalPages = Math.ceil(all.length / limit);
 
-    res.json({
-      records: paginated,
-      totalPages,
-    });
+    res.json({ records: paginated, totalPages });
   } catch (err) {
     res.status(500).json({ message: 'Error fetching attendance.', error: err.message });
   }
 };
 
-// ✅ Get Specific User Attendance (Admin)
+// ✅ Admin: Get One User Attendance
 exports.getUserAttendance = async (req, res) => {
   try {
     const records = await Attendance.find({ userId: req.params.userId }).sort({ date: -1 });
@@ -208,7 +209,7 @@ exports.getUserAttendance = async (req, res) => {
   }
 };
 
-// ✅ Update Checkout Time
+// ✅ Update Checkout
 exports.updateCheckout = async (req, res) => {
   try {
     const { checkOutTime } = req.body;
@@ -228,16 +229,14 @@ exports.updateCheckout = async (req, res) => {
   }
 };
 
-// ✅ Updated Summary with Date support
+// ✅ Summary
 exports.getSummary = async (req, res) => {
   try {
     const queryDate = req.query.date ? getStartOfDay(new Date(req.query.date)) : getStartOfDay(new Date());
-
     const allUsers = await User.find({ role: 'employee' });
     const todayRecords = await Attendance.find({ date: queryDate });
 
     const markedUserIds = new Set(todayRecords.map((r) => r.userId.toString()));
-
     let todayPresent = 0;
     let todayAbsentMarked = 0;
     let todayHalfDay = 0;
@@ -251,10 +250,7 @@ exports.getSummary = async (req, res) => {
       else if (status === 'remote work') todayRemote++;
     });
 
-    const trulyAbsent = allUsers.filter(
-      (u) => !markedUserIds.has(u._id.toString())
-    ).length;
-
+    const trulyAbsent = allUsers.filter((u) => !markedUserIds.has(u._id.toString())).length;
     const totalAbsent = todayAbsentMarked + trulyAbsent;
 
     res.json({
@@ -273,14 +269,9 @@ exports.getSummary = async (req, res) => {
 exports.getMySummary = async (req, res) => {
   try {
     const userId = req.user.userId;
-
     const records = await Attendance.find({ userId });
 
-    let present = 0;
-    let absent = 0;
-    let halfDay = 0;
-    let remoteWork = 0;
-
+    let present = 0, absent = 0, halfDay = 0, remoteWork = 0;
     records.forEach((r) => {
       const status = r.status?.toLowerCase();
       if (status === 'present') present++;
