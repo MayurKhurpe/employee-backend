@@ -5,14 +5,17 @@ const User = require('../models/User');
 
 router.get('/', async (req, res) => {
   try {
-    const users = await User.find({ dob: { $ne: null } }); // only users with dob
+    const all = await User.find({ birthday: { $exists: true } }, 'name birthday');
 
     const today = new Date();
-    const upcoming = users
+    const upcoming = all
       .map((user) => {
-        const dob = new Date(user.dob);
+        const dob = new Date(user.birthday);
         const nextBirthday = new Date(today.getFullYear(), dob.getMonth(), dob.getDate());
-        if (nextBirthday < today) nextBirthday.setFullYear(today.getFullYear() + 1);
+
+        if (nextBirthday < today) {
+          nextBirthday.setFullYear(today.getFullYear() + 1);
+        }
 
         return {
           name: user.name,
@@ -23,8 +26,8 @@ router.get('/', async (req, res) => {
 
     res.json(upcoming);
   } catch (err) {
-    console.error('❌ Birthday fetch error:', err);
-    res.status(500).json({ error: 'Failed to fetch birthdays' });
+    console.error("❌ Birthday fetch error:", err);
+    res.status(500).json({ error: 'Failed to fetch upcoming birthdays' });
   }
 });
 
