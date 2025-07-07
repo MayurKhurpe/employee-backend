@@ -1,4 +1,5 @@
 const LeaveRequest = require('../models/LeaveRequest');
+const User = require('../models/User');
 const nodemailer = require('nodemailer');
 require('dotenv').config();
 
@@ -25,7 +26,7 @@ exports.applyLeave = async (req, res) => {
 
   try {
     const leave = new LeaveRequest({
-      userId: req.user.userId, // 🔑 for population
+      userId: req.user.userId,
       name: req.user.name,
       email: req.user.email,
       leaveType,
@@ -37,19 +38,27 @@ exports.applyLeave = async (req, res) => {
 
     await leave.save();
 
-    // ✉️ Email to Admin
+    // 📩 Email all admins
+    const admins = await User.find({ role: 'admin' });
+    const adminEmails = admins.map(admin => admin.email);
+
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
-      to: process.env.ADMIN_EMAIL,
+      to: adminEmails,
       subject: `📩 New Leave Request - ${req.user.name}`,
       html: `
-        <h2>New Leave Request</h2>
+        <h2>New Leave Request Received</h2>
         <p><strong>Name:</strong> ${req.user.name}</p>
         <p><strong>Email:</strong> ${req.user.email}</p>
         <p><strong>Type:</strong> ${leaveType}</p>
         <p><strong>From:</strong> ${new Date(startDate).toLocaleDateString()}</p>
         <p><strong>To:</strong> ${new Date(endDate).toLocaleDateString()}</p>
         <p><strong>Reason:</strong> ${reason || 'No reason provided'}</p>
+        <hr/>
+        <p>📍 <strong>Application Location:</strong> Seekers Employee Web</p>
+        <p>🔗 <a href="https://employee-web-brown.vercel.app/admin/leave-management" target="_blank">
+          👉 Please take action here
+        </a></p>
       `,
     });
 
