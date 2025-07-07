@@ -12,9 +12,7 @@ cron.schedule('0 9 * * *', async () => {
     const todayDate = today.getDate();
 
     // Find users with birthday today
-    const users = await User.find({
-      dob: { $ne: null },
-    });
+    const users = await User.find({ dob: { $ne: null } });
 
     const birthdayUsers = users.filter((user) => {
       const dob = new Date(user.dob);
@@ -36,12 +34,20 @@ cron.schedule('0 9 * * *', async () => {
         from: process.env.EMAIL_USER,
         to: user.email,
         subject: `🎂 Happy Birthday ${user.name}!`,
-        html: `
-          <p>Hi ${user.name},</p>
-          <p>🎉 Wishing you a very Happy Birthday!</p>
-          <p>We hope you have a great day and an amazing year ahead!</p>
-          <p>🎈 Best wishes from the team! 🎁</p>
-        `,
+html: `
+  <div style="text-align: center; font-family: Arial, sans-serif;">
+    <h2 style="color: #ff4081;">🎉 Happy Birthday, ${user.name}!</h2>
+    <img src="https://employee-web-brown.vercel.app/birthday.gif" 
+         alt="Birthday Cake" 
+         style="width: 160px; margin: 16px 0;" />
+    <p style="font-size: 16px; color: #444;">
+      Wishing you a day filled with joy, laughter, and unforgettable moments. 🎂
+    </p>
+    <p style="font-size: 15px; color: #888;">
+      – Best wishes from the Seekers Automation team 🙏
+    </p>
+  </div>
+`,
       };
 
       await transporter.sendMail(mailOptions);
