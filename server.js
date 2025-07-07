@@ -216,6 +216,9 @@ app.post('/api/approve-user', protect, isAdmin, async (req, res) => {
 // ✅ Daily 6:45 PM Absent Reminder Cron
 require('./utils/absentReminderCron');
 
+// ✅ Daily 9:00 AM Bithday Wish Cron
+require('./utils/birthdayMailer');
+
 // ⏰ Daily Background Jobs
 require('./scheduler');
 
