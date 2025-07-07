@@ -1,24 +1,21 @@
 // 📁 routes/birthday.js
 const express = require('express');
 const router = express.Router();
-const Birthday = require('../models/Birthday');
+const User = require('../models/User');
 
 router.get('/', async (req, res) => {
   try {
-    const all = await Birthday.find();
+    const users = await User.find({ dob: { $ne: null } }); // only users with dob
 
     const today = new Date();
-    const upcoming = all
-      .map((entry) => {
-        const dob = new Date(entry.date);
+    const upcoming = users
+      .map((user) => {
+        const dob = new Date(user.dob);
         const nextBirthday = new Date(today.getFullYear(), dob.getMonth(), dob.getDate());
-
-        if (nextBirthday < today) {
-          nextBirthday.setFullYear(today.getFullYear() + 1); // move to next year
-        }
+        if (nextBirthday < today) nextBirthday.setFullYear(today.getFullYear() + 1);
 
         return {
-          name: entry.name,
+          name: user.name,
           date: nextBirthday.toISOString(),
         };
       })
@@ -26,7 +23,8 @@ router.get('/', async (req, res) => {
 
     res.json(upcoming);
   } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch upcoming birthdays' });
+    console.error('❌ Birthday fetch error:', err);
+    res.status(500).json({ error: 'Failed to fetch birthdays' });
   }
 });
 
