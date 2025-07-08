@@ -115,8 +115,6 @@ router.get('/export-users', async (req, res) => {
   }
 });
 
-router.get('/all-users', protect, isAdmin, adminController.getAllUsers);
-
 // =========================
 // 📊 DASHBOARD ANALYTICS
 // =========================

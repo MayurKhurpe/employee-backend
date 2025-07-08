@@ -1,113 +1,104 @@
-// 📁 controllers/adminController.js
+// 📁 routes/admin.js
+const express = require('express');
+const router = express.Router();
+const { protect } = require('../middleware/auth');
+const isAdmin = require('../middleware/isAdmin');
+
+// ✅ FIX: Import the admin controller
+const adminController = require('../controllers/adminController');
+
+// ⬇️ Models
 const User = require('../models/User');
-const NotificationSetting = require('../models/NotificationSetting');
-const { Parser } = require('json2csv');
-const nodemailer = require('nodemailer');
-require('dotenv').config();
+const LeaveRequest = require('../models/LeaveRequest');
+const Attendance = require('../models/Attendance');
 
-// 📧 Setup email transporter (consider OAuth2 in production for Gmail)
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
+// 🔐 Protect all admin routes
+router.use(protect, isAdmin);
 
-// ✅ Get all unapproved users
-exports.getPendingUsers = async (req, res) => {
+// =========================
+// ✅ USER MANAGEMENT
+// =========================
+
+// 📌 Get all users (handled by controller)
+router.get('/all-users', adminController.getAllUsers);
+
+// ✅ Pending users (in controller)
+router.get('/pending-users', adminController.getPendingUsers);
+
+// ✅ Approve a user (in controller)
+router.post('/approve-user', adminController.approveUser);
+
+// ✅ Reject user with optional email (in controller)
+router.post('/reject-user', adminController.rejectUser);
+
+// ✅ Export approved users to CSV
+router.get('/export-users', adminController.exportUsers);
+
+// ✅ Verify a user (if needed separately)
+router.post('/verify-user', async (req, res) => {
   try {
-    const pendingUsers = await User.find({ isApproved: false });
-    res.status(200).json(pendingUsers);
-  } catch (err) {
-    console.error('Error fetching pending users:', err);
-    res.status(500).json({ error: 'Failed to fetch pending users' });
-  }
-};
-
-// ✅ Approve a user + send email if user has emailNotif = true
-exports.approveUser = async (req, res) => {
-  const { email } = req.body;
-  if (!email) return res.status(400).json({ error: 'Email is required' });
-
-  try {
+    const { email } = req.body;
     const user = await User.findOneAndUpdate(
       { email },
-      { isApproved: true },
+      { isVerified: true },
       { new: true }
     );
     if (!user) return res.status(404).json({ error: 'User not found' });
-
-    // Check user notification preferences
-    const notif = await NotificationSetting.findOne({ userId: user._id });
-    if (notif?.emailNotif) {
-      await transporter.sendMail({
-        from: process.env.EMAIL_USER,
-        to: user.email,
-        subject: '🎉 You have been approved!',
-        html: `
-          <h2>Welcome, ${user.name}!</h2>
-          <p>Your account has been <strong style="color:green;">approved</strong> by the admin team. You can now log in and start using the Employee Management System.</p>
-          <p><a href="${process.env.FRONTEND_URL || 'https://employee-web-brown.vercel.app'}">Click here to login</a></p>
-        `,
-      });
-    }
-
-    res.status(200).json({ message: 'User approved', user });
+    res.json({ message: 'User verified successfully' });
   } catch (err) {
-    console.error('Error approving user:', err);
-    res.status(500).json({ error: 'Failed to approve user' });
+    console.error('❌ Error verifying user:', err);
+    res.status(500).json({ error: 'Failed to verify user' });
   }
-};
+});
 
-// ✅ Reject (delete) a user + optional email notification
-exports.rejectUser = async (req, res) => {
-  const { email, notify = false } = req.body; // notify: boolean to send rejection email
-  if (!email) return res.status(400).json({ error: 'Email is required' });
-
+// ✅ Delete user
+router.delete('/delete-user', async (req, res) => {
   try {
+    const { email } = req.body;
     const user = await User.findOneAndDelete({ email });
     if (!user) return res.status(404).json({ error: 'User not found' });
-
-    if (notify) {
-      // Check user notification preferences
-      const notif = await NotificationSetting.findOne({ userId: user._id });
-      if (notif?.emailNotif) {
-        await transporter.sendMail({
-          from: process.env.EMAIL_USER,
-          to: user.email,
-          subject: '🚫 Account Rejected',
-          html: `
-            <p>Hi ${user.name},</p>
-            <p>We're sorry, but your account registration request has been <span style="color:red;"><strong>rejected</strong></span> by the admin.</p>
-            <p>If you think this is a mistake, please contact the admin team.</p>
-          `,
-        });
-      }
-    }
-
-    res.status(200).json({ message: 'User rejected and deleted' });
+    res.json({ message: 'User deleted successfully' });
   } catch (err) {
-    console.error('Error rejecting user:', err);
-    res.status(500).json({ error: 'Failed to reject user' });
+    console.error('❌ Delete user error:', err);
+    res.status(500).json({ error: 'Error deleting user' });
   }
-};
+});
 
-// 📤 Export all approved users to CSV
-exports.exportUsers = async (req, res) => {
+// =========================
+// 📊 DASHBOARD ANALYTICS
+// =========================
+router.get('/stats', async (req, res) => {
   try {
-    const users = await User.find({ isApproved: true }).select('name email role createdAt');
+    const [
+      totalUsers,
+      pendingUsers,
+      totalLeaves,
+      pendingLeaves,
+      todayCheckIns,
+    ] = await Promise.all([
+      User.countDocuments(),
+      User.countDocuments({ isApproved: false }),
+      LeaveRequest.countDocuments(),
+      LeaveRequest.countDocuments({ status: 'Pending' }),
+      Attendance.countDocuments({
+        date: {
+          $gte: new Date(new Date().setHours(0, 0, 0, 0)),
+          $lte: new Date(new Date().setHours(23, 59, 59, 999)),
+        },
+      }),
+    ]);
 
-    const fields = ['name', 'email', 'role', 'createdAt'];
-    const opts = { fields };
-    const parser = new Parser(opts);
-    const csv = parser.parse(users);
-
-    res.header('Content-Type', 'text/csv');
-    res.attachment('users.csv');
-    return res.send(csv);
+    res.json({
+      totalUsers,
+      pendingUsers,
+      totalLeaves,
+      pendingLeaves,
+      todayCheckIns,
+    });
   } catch (err) {
-    console.error('❌ Export users error:', err);
-    res.status(500).json({ error: 'Failed to export users' });
+    console.error('📊 Admin stats error:', err);
+    res.status(500).json({ error: 'Failed to fetch admin stats' });
   }
-};
+});
+
+module.exports = router;
