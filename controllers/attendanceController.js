@@ -303,27 +303,50 @@ exports.getSummary = async (req, res) => {
   }
 };
 
-// ✅ My Summary
+// ✅ Updated My Summary - with auto absent detection
 exports.getMySummary = async (req, res) => {
   try {
     const userId = req.user.userId;
-    const records = await Attendance.find({ userId });
 
-    let present = 0, absent = 0, halfDay = 0, remoteWork = 0;
-    records.forEach((r) => {
-      const status = r.status?.toLowerCase();
-      if (status === 'present') present++;
-      else if (status === 'absent') absent++;
-      else if (status === 'half day') halfDay++;
-      else if (status === 'remote work') remoteWork++;
+    const today = new Date();
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+
+    // Fetch attendance records for current month
+    const records = await Attendance.find({
+      userId,
+      date: { $gte: startOfMonth, $lte: today },
     });
+
+    // Create a map of marked dates
+    const markedDates = new Set(records.map(r => new Date(r.date).toDateString()));
+
+    let present = 0, halfDay = 0, remoteWork = 0, absent = 0;
+
+    for (
+      let d = new Date(startOfMonth);
+      d <= today;
+      d.setDate(d.getDate() + 1)
+    ) {
+      const dateStr = d.toDateString();
+      const rec = records.find(r => new Date(r.date).toDateString() === dateStr);
+
+      if (!rec) {
+        absent++;
+      } else {
+        const status = rec.status?.toLowerCase();
+        if (status === 'present') present++;
+        else if (status === 'half day') halfDay++;
+        else if (status === 'remote work') remoteWork++;
+        else if (status === 'absent') absent++;
+      }
+    }
 
     res.json({
       present,
       absent,
       halfDay,
       remoteWork,
-      totalDays: records.length,
+      totalDays: present + absent + halfDay + remoteWork,
     });
   } catch (err) {
     res.status(500).json({ message: 'Error fetching summary.', error: err.message });
