@@ -37,14 +37,14 @@ const updateProfile = async (req, res) => {
       user.email = email;
     }
 
-    user.name = name || user.name;
-    user.address = address || user.address;
-    user.mobile = mobile || user.mobile;
-    user.emergencyMobile = emergencyMobile || user.emergencyMobile;
-    user.bloodGroup = bloodGroup || user.bloodGroup;
-    user.department = department || user.department;
-    user.joiningDate = joiningDate || user.joiningDate;
-    user.dob = dob || user.dob;
+     user.name = name || user.name;
+     user.address = address || user.address;
+     user.mobile = mobile || user.mobile;
+     user.emergencyMobile = emergencyMobile || user.emergencyMobile;
+     user.bloodGroup = bloodGroup || user.bloodGroup;
+     user.department = department || user.department;
+     user.joiningDate = joiningDate ? new Date(joiningDate) : user.joiningDate;
+     user.dob = dob ? new Date(dob) : user.dob;
 
     await user.save();
 
