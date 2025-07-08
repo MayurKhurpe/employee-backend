@@ -19,7 +19,7 @@ router.use(protect, isAdmin);
 // 📌 New: Get all users (for full user list with stats)
 router.get('/all-users', async (req, res) => {
   try {
-    const users = await User.find().select('name email role isApproved isVerified');
+    const users = await User.find().select('name email role isApproved isVerified bloodGroup joiningDate');
     res.json(users);
   } catch (err) {
     console.error('❌ Error fetching all users:', err);
