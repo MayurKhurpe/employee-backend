@@ -352,3 +352,15 @@ exports.getMySummary = async (req, res) => {
     res.status(500).json({ message: 'Error fetching summary.', error: err.message });
   }
 };
+// ✅ Get all users (Admin User Management)
+exports.getAllUsers = async (req, res) => {
+  try {
+    const users = await User.find().select(
+      'name email role isApproved isVerified joiningDate bloodGroup'
+    );
+    res.status(200).json(users);
+  } catch (err) {
+    console.error('Error fetching all users:', err);
+    res.status(500).json({ error: 'Failed to fetch users' });
+  }
+};
