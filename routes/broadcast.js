@@ -38,11 +38,12 @@ router.post('/', protect, isAdmin, async (req, res) => {
 
     if (emailList.length > 0) {
       await transporter.sendMail({
-        from: `"MES HR" <${process.env.EMAIL_USER}>`,
-        to: emailList,
-        subject: '📢 New Broadcast Message from Admin',
-        html: `<p>${message}</p><br><p>— MES HR Portal</p>`,
-      });
+      from: `"SAPL HR" <${process.env.EMAIL_USER}>`,
+      to: 'hr.seekersautomation@gmail.com',   // only HR receives in "To"
+      bcc: emailList,                          // all users hidden in "BCC"
+      subject: ' New Broadcast Message from Admin 📢 ',
+      html: `<p>${message}</p><br><p>— SAPL HR Portal</p>`,
+     });
     }
 
     res.json({ message: '✅ Broadcast sent and users notified', data: broadcast });
