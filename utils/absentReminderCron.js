@@ -5,6 +5,12 @@ const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 dotenv.config();
 
+const dayjs = require('dayjs');
+const utc = require('dayjs/plugin/utc');
+const timezone = require('dayjs/plugin/timezone');
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
 const Attendance = require('../models/attendanceModel');
 const User = require('../models/User');
 
@@ -17,34 +23,31 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// 📅 Get start of the day
-const getStartOfDay = (date) => {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  return d;
+// 📅 Get start of the day in IST
+const getStartOfDayIST = () => {
+  return dayjs().tz('Asia/Kolkata').startOf('day').toDate();
 };
 
-// 🕒 Run every day at 6:45 PM
-cron.schedule('45 18 * * *', async () => {
-  console.log('⏰ Running Absent Reminder Email Cron at 6:45 PM');
+// 🕒 Run every day at 9:00 AM IST (which is 3:30 AM UTC)
+cron.schedule('30 3 * * *', async () => {
+  console.log('⏰ Running Absent Reminder Email Cron at 9:00 AM IST');
 
-  const today = getStartOfDay(new Date());
+  const today = getStartOfDayIST();
 
   try {
     const users = await User.find({ role: 'employee' });
     const markedToday = await Attendance.find({ date: today });
 
     const markedUserIds = new Set(markedToday.map((r) => r.userId.toString()));
-
     const absentUsers = users.filter((u) => !markedUserIds.has(u._id.toString()));
 
     for (const user of absentUsers) {
       const mailOptions = {
         from: process.env.EMAIL_USER,
         to: user.email,
-        subject: '', // optional subject
+        subject: `🕒 Attendance Reminder - ${user.name}`,
         html: `
-          Hi ${user.name}, your attendance has been not marked as Present/Half Day for ${today.getDate()} ${today.toLocaleString('default', { month: 'long' })} ${today.getFullYear()}.<br>
+          Hi ${user.name}, your attendance has not been marked as Present/Half Day for ${today.getDate()} ${today.toLocaleString('default', { month: 'long' })} ${today.getFullYear()}.<br>
           ${today.toLocaleDateString('en-GB', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' })}<br>
           📌 Status: Absent<br><br>
           🕒 In: N/A | Out: N/A

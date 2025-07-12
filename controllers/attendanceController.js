@@ -51,6 +51,19 @@ exports.markAttendance = async (req, res) => {
       assignedBy,
     } = req.body;
 
+    // ⏰ Cutoff logic to prevent "Present" after 9:45 AM IST
+const dayjs = require('dayjs');
+const utc = require('dayjs/plugin/utc');
+const timezone = require('dayjs/plugin/timezone');
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
+const nowIST = dayjs().tz('Asia/Kolkata');
+if (status === 'Present' && nowIST.isAfter(nowIST.hour(9).minute(45).second(0))) {
+  return res.status(403).json({
+    message: '⛔ Marking Present not allowed after 9:45 AM IST.',
+  });
+}
     const today = getStartOfDay(new Date());
 
     const alreadyMarked = await Attendance.findOne({ userId, date: today });
