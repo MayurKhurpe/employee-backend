@@ -29,16 +29,29 @@ const getStartOfDayIST = () => {
 };
 
 // 🕒 Run every day at 9:00 AM IST (which is 3:30 AM UTC)
+const validStatuses = ['Present', 'Half Day', 'Remote Work'];
+
 cron.schedule('30 3 * * *', async () => {
   console.log('⏰ Running Absent Reminder Email Cron at 9:00 AM IST');
 
   const today = getStartOfDayIST();
+  const tomorrow = dayjs(today).add(1, 'day').toDate();
 
   try {
     const users = await User.find({ role: 'employee' });
-    const markedToday = await Attendance.find({ date: today });
 
-    const markedUserIds = new Set(markedToday.map((r) => r.userId.toString()));
+    // ✅ Only attendance records from today
+    const todayRecords = await Attendance.find({
+      date: { $gte: today, $lt: tomorrow }
+    });
+
+    // ✅ Filter only valid attendance statuses
+    const markedUserIds = new Set(
+      todayRecords
+        .filter((r) => validStatuses.includes(r.status))
+        .map((r) => r.userId.toString())
+    );
+
     const absentUsers = users.filter((u) => !markedUserIds.has(u._id.toString()));
 
     for (const user of absentUsers) {
@@ -47,9 +60,9 @@ cron.schedule('30 3 * * *', async () => {
         to: user.email,
         subject: `🕒 Attendance Reminder - ${user.name}`,
         html: `
-          Hi ${user.name}, your attendance has not been marked as Present/Half Day for ${today.getDate()} ${today.toLocaleString('default', { month: 'long' })} ${today.getFullYear()}.<br>
-          ${today.toLocaleDateString('en-GB', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' })}<br>
-          📌 Status: Absent<br><br>
+          Hi ${user.name}, your attendance has not been marked as Present/Half Day/Remote Work for 
+          ${today.toLocaleDateString('en-GB', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' })}.<br><br>
+          📌 Status: Absent<br>
           🕒 In: N/A | Out: N/A
         `,
       };
@@ -61,3 +74,4 @@ cron.schedule('30 3 * * *', async () => {
     console.error('❌ Error in absent reminder cron:', err);
   }
 });
+

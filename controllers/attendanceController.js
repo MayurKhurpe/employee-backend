@@ -61,7 +61,7 @@ dayjs.extend(timezone);
 const nowIST = dayjs().tz('Asia/Kolkata');
 if (status === 'Present' && nowIST.isAfter(nowIST.hour(9).minute(45).second(0))) {
   return res.status(403).json({
-    message: '⛔ Marking Present not allowed after 9:45 AM IST.',
+    message: '⛔ Marking Present not allowed after 9:45 AM IST. Please use Late Mark.',
   });
 }
     const today = getStartOfDay(new Date());
@@ -71,6 +71,22 @@ if (status === 'Present' && nowIST.isAfter(nowIST.hour(9).minute(45).second(0)))
 
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ message: 'User not found' });
+
+    // ✅ Limit Late Mark to 3 times per month
+if (status === 'Late Mark') {
+  const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  const lateMarksThisMonth = await Attendance.countDocuments({
+    userId,
+    date: { $gte: startOfMonth, $lte: today },
+    status: 'Late Mark',
+  });
+
+  if (lateMarksThisMonth >= 3) {
+    return res.status(403).json({
+      message: '❌ You’ve reached your Late Mark limit for this month. Be on time — it helps you only.',
+    });
+  }
+}
 
     if (status === 'Remote Work' && (!customer || !workLocation || !assignedBy)) {
       return res.status(400).json({ message: 'All remote work fields are required.' });
@@ -127,18 +143,23 @@ if (status === 'Present' && nowIST.isAfter(nowIST.hour(9).minute(45).second(0)))
 
     let body = '';
     if (status === 'Remote Work') {
-      body = `Hi ${user.name}, your attendance has been marked as Remote Work for ${displayDate}.<br><br>
-        📌 <strong>Status:</strong> Remote Work<br><br>
-        👤 <strong>Customer:</strong> ${customer}<br>
-        🏢 <strong>Location:</strong> ${workLocation}<br>
-        📨 <strong>Assigned By:</strong> ${assignedBy}<br><br>
-        🕒 <strong>In:</strong> ${checkInTime || 'N/A'} | <strong>Out:</strong> N/A`;
-    } else {
-      body = `Hi ${user.name}, your attendance has been marked as ${status} for ${displayDate}.<br>
-        ${fullDateStr}<br><br>
-        📌 <strong>Status:</strong> ${status}<br><br>
-        🕒 <strong>In:</strong> N/A | <strong>Out:</strong> N/A`;
-    }
+  body = `Hi ${user.name}, your attendance has been marked as Remote Work for ${displayDate}.<br><br>
+    📌 <strong>Status:</strong> Remote Work<br><br>
+    👤 <strong>Customer:</strong> ${customer}<br>
+    🏢 <strong>Location:</strong> ${workLocation}<br>
+    📨 <strong>Assigned By:</strong> ${assignedBy}<br><br>
+    🕒 <strong>In:</strong> ${checkInTime || 'N/A'} | <strong>Out:</strong> N/A`;
+} else if (status === 'Late Mark') {
+  body = `Hi ${user.name}, your attendance has been marked as <strong>Late</strong> for ${displayDate}.<br><br>
+    📌 <strong>Status:</strong> Late Mark<br>
+    🕒 <strong>In:</strong> ${checkInTime || 'N/A'} | <strong>Out:</strong> N/A<br><br>
+    Please ensure to mark on time tomorrow.`;
+} else {
+  body = `Hi ${user.name}, your attendance has been marked as ${status} for ${displayDate}.<br>
+    ${fullDateStr}<br><br>
+    📌 <strong>Status:</strong> ${status}<br><br>
+    🕒 <strong>In:</strong> N/A | <strong>Out:</strong> N/A`;
+}
 
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
@@ -292,6 +313,7 @@ exports.getSummary = async (req, res) => {
     let todayAbsentMarked = 0;
     let todayHalfDay = 0;
     let todayRemote = 0;
+    let todayLateMark = 0; // ✅ New
 
     todayRecords.forEach((r) => {
       const status = r.status?.toLowerCase();
@@ -299,6 +321,7 @@ exports.getSummary = async (req, res) => {
       else if (status === 'absent') todayAbsentMarked++;
       else if (status === 'half day') todayHalfDay++;
       else if (status === 'remote work') todayRemote++;
+      else if (status === 'late mark') todayLateMark++; // ✅ Count Late Mark
     });
 
     const trulyAbsent = allUsers.filter((u) => !markedUserIds.has(u._id.toString())).length;
@@ -309,6 +332,7 @@ exports.getSummary = async (req, res) => {
       todayAbsent: totalAbsent,
       todayHalfDay,
       todayRemote,
+      todayLateMark, // ✅ Include in API response
       totalEmployees: allUsers.length,
     });
   } catch (err) {
@@ -317,32 +341,26 @@ exports.getSummary = async (req, res) => {
 };
 
 // ✅ Updated My Summary - with auto absent detection
+// ✅ Updated My Summary - with late mark count
 exports.getMySummary = async (req, res) => {
   try {
     const userId = req.user.userId;
-
     const today = new Date();
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 
-    // Fetch attendance records for current month
     const records = await Attendance.find({
       userId,
       date: { $gte: startOfMonth, $lte: today },
     });
 
-    // Create a map of marked dates
-    const markedDates = new Set(records.map(r => new Date(r.date).toDateString()));
-
-    let present = 0, halfDay = 0, remoteWork = 0, absent = 0;
+    let present = 0, halfDay = 0, remoteWork = 0, absent = 0, lateMarks = 0;
 
     for (
       let d = new Date(startOfMonth);
       d <= today;
       d.setDate(d.getDate() + 1)
     ) {
-      const dateStr = d.toDateString();
-      const rec = records.find(r => new Date(r.date).toDateString() === dateStr);
-
+      const rec = records.find(r => new Date(r.date).toDateString() === d.toDateString());
       if (!rec) {
         absent++;
       } else {
@@ -351,6 +369,7 @@ exports.getMySummary = async (req, res) => {
         else if (status === 'half day') halfDay++;
         else if (status === 'remote work') remoteWork++;
         else if (status === 'absent') absent++;
+        else if (status === 'late mark') lateMarks++;
       }
     }
 
@@ -359,12 +378,14 @@ exports.getMySummary = async (req, res) => {
       absent,
       halfDay,
       remoteWork,
+      lateMarks, // ✅ ADD THIS
       totalDays: present + absent + halfDay + remoteWork,
     });
   } catch (err) {
     res.status(500).json({ message: 'Error fetching summary.', error: err.message });
   }
 };
+
 // ✅ Get all users (Admin User Management)
 exports.getAllUsers = async (req, res) => {
   try {
