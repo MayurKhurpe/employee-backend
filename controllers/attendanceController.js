@@ -21,8 +21,8 @@ const getStartOfDay = (date) => {
 
 // ✅ Distance Check (within 1 km)
 function isWithinOffice(lat, lng) {
-  const officeLat = 18.5204;
-  const officeLng = 73.8567;
+  const officeLat = 18.641478;
+  const officeLng = 73.795228;
   const R = 6371;
   const toRad = (val) => (val * Math.PI) / 180;
 
@@ -140,6 +140,7 @@ if (status === 'Late Mark') {
     // ✅ Email to employee
     const fullDateStr = today.toLocaleDateString('en-GB', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' });
     const displayDate = `${today.getDate()} ${today.toLocaleString('default', { month: 'long' })} ${today.getFullYear()}`;
+    const formattedInTime = checkInTime ? new Date(checkInTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }): 'N/A';
 
     let body = '';
     if (status === 'Remote Work') {
@@ -148,17 +149,17 @@ if (status === 'Late Mark') {
     👤 <strong>Customer:</strong> ${customer}<br>
     🏢 <strong>Location:</strong> ${workLocation}<br>
     📨 <strong>Assigned By:</strong> ${assignedBy}<br><br>
-    🕒 <strong>In:</strong> ${checkInTime || 'N/A'} | <strong>Out:</strong> N/A`;
+    🕒 <strong>In:</strong> ${formattedInTime} | <strong>Out:</strong> N/A`;
 } else if (status === 'Late Mark') {
   body = `Hi ${user.name}, your attendance has been marked as <strong>Late</strong> for ${displayDate}.<br><br>
     📌 <strong>Status:</strong> Late Mark<br>
-    🕒 <strong>In:</strong> ${checkInTime || 'N/A'} | <strong>Out:</strong> N/A<br><br>
+    🕒 <strong>In:</strong> ${formattedInTime} | <strong>Out:</strong> N/A<br><br>
     Please ensure to mark on time tomorrow.`;
 } else {
   body = `Hi ${user.name}, your attendance has been marked as ${status} for ${displayDate}.<br>
     ${fullDateStr}<br><br>
     📌 <strong>Status:</strong> ${status}<br><br>
-    🕒 <strong>In:</strong> N/A | <strong>Out:</strong> N/A`;
+    🕒 <strong>In:</strong> ${formattedInTime} | <strong>Out:</strong> N/A`;
 }
 
     await transporter.sendMail({

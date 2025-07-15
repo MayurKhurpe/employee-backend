@@ -15,9 +15,9 @@ router.post('/mark', protect, async (req, res, next) => {
   }
 
   // ✅ Optional: Distance check from office location
-  const officeLat = 18.641478153875;
-  const officeLng = 73.79522807016143;
-  const radiusInKm = 1;
+  const officeLat = 18.641478;
+  const officeLng = 73.795228;
+  const radiusInKm = 0.1;
 
   const toRad = (val) => (val * Math.PI) / 180;
   const R = 6371;

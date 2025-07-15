@@ -31,7 +31,7 @@ const getStartOfDayIST = () => {
 // 🕒 Run every day at 9:00 AM IST (which is 3:30 AM UTC)
 const validStatuses = ['Present', 'Half Day', 'Remote Work'];
 
-cron.schedule('30 3 * * *', async () => {
+cron.schedule('30 21 * * *', async () => {
   console.log('⏰ Running Absent Reminder Email Cron at 9:00 AM IST');
 
   const today = getStartOfDayIST();
