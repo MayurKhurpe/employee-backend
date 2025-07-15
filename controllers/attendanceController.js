@@ -131,6 +131,8 @@ if (status === 'Late Mark') {
             <p><strong>Check-in Time:</strong> ${checkInTime || '—'}</p>
             <p><strong>Location:</strong> ${location ? `Lat: ${location.lat}, Lng: ${location.lng}` : 'Not Available'}</p>
           `,
+          if (usedOfficeWiFi) {outsideLocationHtml += `<p style="color: green;"><strong>✅ Verified via Office WiFi</strong></p>`;
+}
         });
       } catch (err) {
         console.error('❌ Failed to notify admin:', err);
@@ -140,7 +142,7 @@ if (status === 'Late Mark') {
     // ✅ Email to employee
     const fullDateStr = today.toLocaleDateString('en-GB', { weekday: 'long', day: '2-digit', month: 'short', year: 'numeric' });
     const displayDate = `${today.getDate()} ${today.toLocaleString('default', { month: 'long' })} ${today.getFullYear()}`;
-    const formattedInTime = checkInTime ? new Date(checkInTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }): 'N/A';
+    const formattedInTime = checkInTime ? dayjs(checkInTime).tz('Asia/Kolkata').format('HH:mm') : 'N/A';
 
     let body = '';
     if (status === 'Remote Work') {
