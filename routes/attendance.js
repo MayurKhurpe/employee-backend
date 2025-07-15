@@ -56,6 +56,9 @@ router.post('/mark', protect, async (req, res, next) => {
         <p><strong>Distance:</strong> ${distance.toFixed(2)} km</p>
         <p><strong>Time:</strong> ${new Date().toLocaleString()}</p>
       `,
+      if (usedOfficeWiFi) {
+  outsideLocationHtml += `<p style="color: green;"><strong>✅ Verified via Office WiFi</strong></p>`;
+}
     };
 
     transporter.sendMail(mailOptions, (error, info) => {
