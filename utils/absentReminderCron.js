@@ -11,7 +11,7 @@ dayjs.extend(timezone);
 
 const Attendance = require('../models/attendanceModel');
 const User = require('../models/User');
-const Leave = require('../models/leaveModel');
+const Leave = require('../models/LeaveRequest');
 const Holiday = require('../models/holidayModel'); // ✅ Add Holiday model
 
 // 📧 Email transporter
