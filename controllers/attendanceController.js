@@ -116,6 +116,17 @@ if (status === 'Late Mark') {
     });
 
     await newAttendance.save();
+    // ✅ Remaining Late Marks this month (after this entry)
+let remainingLateMarks = null;
+if (status === 'Late Mark') {
+  const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  const lateMarksAfterSave = await Attendance.countDocuments({
+    userId,
+    date: { $gte: startOfMonth, $lte: today },
+    status: 'Late Mark',
+  });
+  remainingLateMarks = Math.max(0, 3 - lateMarksAfterSave);
+}
 
     // ✅ Email to admin if outside
     if (['Present', 'Half Day'].includes(status) && outsideLocation) {
@@ -131,8 +142,7 @@ if (status === 'Late Mark') {
             <p><strong>Check-in Time:</strong> ${checkInTime || '—'}</p>
             <p><strong>Location:</strong> ${location ? `Lat: ${location.lat}, Lng: ${location.lng}` : 'Not Available'}</p>
           `,
-          if (usedOfficeWiFi) {outsideLocationHtml += `<p style="color: green;"><strong>✅ Verified via Office WiFi</strong></p>`;
-}
+          
         });
       } catch (err) {
         console.error('❌ Failed to notify admin:', err);
@@ -171,7 +181,11 @@ if (status === 'Late Mark') {
       html: body,
     });
 
-    res.status(201).json({ message: 'Attendance marked successfully.', attendance: newAttendance });
+    res.status(201).json({
+  message: 'Attendance marked successfully.',
+  attendance: newAttendance,
+  remainingLateMarks,
+});
   } catch (err) {
     console.error('❌ Attendance Marking Failed:', err);
     res.status(500).json({ message: 'Error marking attendance.', error: err.message });
@@ -223,6 +237,15 @@ exports.getAllAttendance = async (req, res) => {
     if (userId) filter.userId = userId;
 
     const marked = await Attendance.find(filter);
+    // ✅ Count Late Marks for each user in current filter
+const lateMarksCount = await Attendance.aggregate([
+  { $match: { ...filter, status: 'Late Mark' } },
+  { $group: { _id: '$userId', count: { $sum: 1 } } }
+]);
+
+const lateMarksMap = new Map();
+lateMarksCount.forEach(item => lateMarksMap.set(item._id.toString(), item.count));
+
     const map = new Map();
     marked.forEach((r) => map.set(r.userId.toString() + r.date?.toISOString(), r));
 
@@ -240,30 +263,35 @@ exports.getAllAttendance = async (req, res) => {
           ? marked.find((r) => r.userId.toString() === user._id.toString())
           : map.get(user._id.toString() + queryDate?.toISOString());
 
-        return key || {
-          _id: 'not-marked-' + user._id,
-          userId: user._id,
-          name: user.name,
-          email: user.email,
-          date: queryDate || new Date(),
-          status: 'Not Marked Yet',
-          checkInTime: null,
-          checkOutTime: null,
-          location: '—',
-          customer: '—',
-          workLocation: '—',
-          assignedBy: '—',
-        };
-      });
+       return {
+  ...(key ? key.toObject() : {
+    _id: 'not-marked-' + user._id,
+    userId: user._id,
+    name: user.name,
+    email: user.email,
+    date: queryDate || new Date(),
+    status: 'Not Marked Yet',
+    checkInTime: null,
+    checkOutTime: null,
+    location: '—',
+    customer: '—',
+    workLocation: '—',
+    assignedBy: '—',
+  }),
+  lateMarks: lateMarksMap.get(user._id.toString()) || 0 // ✅ Add Late Mark Count
+};
+});
 
-      if (month) {
-        all = marked.map((rec) => rec.toObject());
-      }
-    }
-
+if (month) {
+  all = marked.map((rec) => ({
+    ...rec.toObject(),
+    lateMarks: lateMarksMap.get(rec.userId.toString()) || 0
+  }));
+}
+}
     const sorted = all.sort((a, b) => new Date(b.date) - new Date(a.date));
-    const start = (page - 1) * limit;
-    const paginated = sorted.slice(start, start + Number(limit));
+    const skip = (page - 1) * Number(limit);
+    const paginated = sorted.slice(skip, skip + Number(limit));
     const totalPages = Math.ceil(all.length / limit);
 
     res.json({ records: paginated, totalPages });
