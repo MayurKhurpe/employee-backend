@@ -14,21 +14,12 @@ dayjs.extend(timezone);
 // ✅ Safe time formatter: handles "HH:mm" string, ISO string, Date object
 function formatTimeSafe(val) {
   if (!val) return 'N/A';
-
-  // Plain "HH:mm" or "H:mm" string from client
   if (typeof val === 'string') {
     const hm = val.trim();
     if (/^\d{1,2}:\d{2}$/.test(hm)) return hm;
   }
-
-  // Try parse as date/timestamp
   const d = dayjs(val);
-  if (d.isValid()) {
-    // Use IST
-    return d.tz('Asia/Kolkata').format('HH:mm');
-  }
-
-  return 'N/A';
+  return d.isValid() ? d.tz('Asia/Kolkata').format('HH:mm') : 'N/A';
 }
 
 // ✅ Email transporter
@@ -53,25 +44,25 @@ function isWithinOffice(lat, lng) {
   const officeLng = 73.795228;
   const R = 6371;
   const toRad = (val) => (val * Math.PI) / 180;
-
   const dLat = toRad(officeLat - lat);
   const dLng = toRad(officeLng - lng);
   const a =
     Math.sin(dLat / 2) ** 2 +
     Math.cos(toRad(lat)) * Math.cos(toRad(officeLat)) * Math.sin(dLng / 2) ** 2;
-
   const distance = 2 * R * Math.asin(Math.sqrt(a));
   return distance <= 1;
 }
 
-// ✅ Mark Attendance
+/* ------------------------------------------------------------------
+   MARK ATTENDANCE  (User submits → Pending approval)
+------------------------------------------------------------------ */
 exports.markAttendance = async (req, res) => {
   try {
     const userId = req.user?.userId;
     if (!userId) return res.status(401).json({ message: 'Unauthorized: Missing userId' });
 
     const {
-      status = 'Present',
+      status = 'Present',   // user's requested status
       location = null,
       checkInTime,
       customer,
@@ -79,7 +70,7 @@ exports.markAttendance = async (req, res) => {
       assignedBy,
     } = req.body;
 
-    // ⏰ Cutoff logic to prevent "Present" after 9:45 AM IST
+    // ⏰ Cutoff: Present off after 9:45 AM IST
     const nowIST = dayjs().tz('Asia/Kolkata');
     if (status === 'Present' && nowIST.isAfter(nowIST.hour(9).minute(45).second(0))) {
       return res.status(403).json({
@@ -87,11 +78,16 @@ exports.markAttendance = async (req, res) => {
       });
     }
 
-    // NOTE: Using server-local start of day. If server != IST, switch to dayjs IST start.
+    // NOTE: if server not IST, consider moving to dayjs IST start
     const today = getStartOfDay(new Date());
 
+    // block if already exists
     const alreadyMarked = await Attendance.findOne({ userId, date: today });
     if (alreadyMarked) {
+      // if pending, tell user
+      if (alreadyMarked.approvalStatus === 'Pending') {
+        return res.status(400).json({ message: 'Attendance already pending for approval.' });
+      }
       return res.status(400).json({ message: 'Attendance already marked for today.' });
     }
 
@@ -106,7 +102,6 @@ exports.markAttendance = async (req, res) => {
         date: { $gte: startOfMonth, $lte: today },
         status: 'Late Mark',
       });
-
       if (lateMarksThisMonth >= 3) {
         return res.status(403).json({
           message: '❌ You’ve reached your Late Mark limit for this month. Be on time — it helps you only.',
@@ -114,7 +109,7 @@ exports.markAttendance = async (req, res) => {
       }
     }
 
-    // ✅ Validate remote work details
+    // ✅ Required extra fields for Remote Work
     if (status === 'Remote Work' && (!customer || !workLocation || !assignedBy)) {
       return res.status(400).json({ message: 'All remote work fields are required.' });
     }
@@ -125,18 +120,19 @@ exports.markAttendance = async (req, res) => {
       if (!location || typeof location.lat !== 'number' || typeof location.lng !== 'number') {
         outsideLocation = true;
       } else {
-        const isInside = isWithinOffice(location.lat, location.lng);
-        outsideLocation = !isInside;
+        outsideLocation = !isWithinOffice(location.lat, location.lng);
       }
     }
 
-    // ✅ Save attendance
+    // ✅ Save attendance with approvalStatus = Pending + requestedStatus
     const newAttendance = new Attendance({
       userId,
       name: user.name,
       email: user.email,
       date: today,
-      status,
+      status,                 // keep existing status field (backward compatible)
+      requestedStatus: status, // NEW
+      approvalStatus: 'Pending', // NEW
       checkInTime,
       location: location ? `${location.lat},${location.lng}` : undefined,
       customer,
@@ -146,7 +142,7 @@ exports.markAttendance = async (req, res) => {
 
     await newAttendance.save();
 
-    // ✅ Remaining Late Marks this month (after save)
+    // ✅ Remaining Late Marks this month (after save) - unchanged
     let remainingLateMarks = null;
     if (status === 'Late Mark') {
       const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -158,7 +154,7 @@ exports.markAttendance = async (req, res) => {
       remainingLateMarks = Math.max(0, 3 - lateMarksAfterSave);
     }
 
-    // ✅ Email to admin if outside office
+    // ✅ Email to admin if outside (unchanged)
     if (['Present', 'Half Day'].includes(status) && outsideLocation) {
       try {
         await transporter.sendMail({
@@ -178,53 +174,101 @@ exports.markAttendance = async (req, res) => {
       }
     }
 
-    // ✅ Email to employee (status confirmation)
-    const fullDateStr = today.toLocaleDateString('en-GB', {
-      weekday: 'long',
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    });
-    const displayDate = `${today.getDate()} ${today.toLocaleString('default', {
-      month: 'long',
-    })} ${today.getFullYear()}`;
-    const formattedInTime = formatTimeSafe(checkInTime);
-
-    let body = '';
-    if (status === 'Remote Work') {
-      body = `Hi ${user.name}, your attendance has been marked as Remote Work for ${displayDate}.<br><br>
-        📌 <strong>Status:</strong> Remote Work<br><br>
-        👤 <strong>Customer:</strong> ${customer}<br>
-        🏢 <strong>Location:</strong> ${workLocation}<br>
-        📨 <strong>Assigned By:</strong> ${assignedBy}<br><br>
-        🕒 <strong>In:</strong> ${formattedInTime} | <strong>Out:</strong> N/A`;
-    } else if (status === 'Late Mark') {
-      body = `Hi ${user.name}, your attendance has been marked as <strong>Late</strong> for ${displayDate}.<br><br>
-        📌 <strong>Status:</strong> Late Mark<br>
-        🕒 <strong>In:</strong> ${formattedInTime} | <strong>Out:</strong> N/A<br><br>
-        Please ensure to mark on time tomorrow.`;
-    } else {
-      body = `Hi ${user.name}, your attendance has been marked as ${status} for ${displayDate}.<br>
-        ${fullDateStr}<br><br>
-        📌 <strong>Status:</strong> ${status}<br><br>
-        🕒 <strong>In:</strong> ${formattedInTime} | <strong>Out:</strong> N/A`;
-    }
-
+    // ✅ Email to employee – PENDING APPROVAL
+    const displayDate = dayjs(today).tz('Asia/Kolkata').format('DD MMM YYYY (dddd)');
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
       to: user.email,
-      subject: `📝 Attendance Marked - ${status}`,
-      html: body,
+      subject: `📝 Attendance Submitted - Pending Approval`,
+      html: `
+        Hi ${user.name},<br><br>
+        Your attendance for <strong>${displayDate}</strong> has been submitted as <strong>${status}</strong>.<br>
+        Current status: <strong>Pending HR Approval</strong>.<br><br>
+        You will receive another email once HR approves or rejects it.
+      `,
     });
 
     res.status(201).json({
-      message: 'Attendance marked successfully.',
+      message: 'Attendance submitted (Pending approval).',
       attendance: newAttendance,
       remainingLateMarks,
     });
   } catch (err) {
     console.error('❌ Attendance Marking Failed:', err);
     res.status(500).json({ message: 'Error marking attendance.', error: err.message });
+  }
+};
+
+/* ------------------------------------------------------------------
+   ADMIN: Approve Attendance
+------------------------------------------------------------------ */
+exports.approveAttendance = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const attendance = await Attendance.findById(id);
+    if (!attendance) return res.status(404).json({ message: 'Attendance not found' });
+
+    if (attendance.approvalStatus !== 'Pending') {
+      return res.status(400).json({ message: 'Attendance already processed.' });
+    }
+
+    // use requestedStatus if present as final status
+    if (attendance.requestedStatus) attendance.status = attendance.requestedStatus;
+    attendance.approvalStatus = 'Approved';
+    await attendance.save();
+
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: attendance.email,
+      subject: '✅ Attendance Approved',
+      html: `
+        Hi ${attendance.name},<br><br>
+        Your attendance for <b>${attendance.date.toDateString()}</b> has been <b>APPROVED</b> as <b>${attendance.status}</b>.<br><br>
+        Thank you.
+      `,
+    });
+
+    res.json({ message: 'Attendance approved successfully.', attendance });
+  } catch (err) {
+    console.error('❌ Approve error:', err);
+    res.status(500).json({ message: 'Error approving attendance.', error: err.message });
+  }
+};
+
+/* ------------------------------------------------------------------
+   ADMIN: Reject Attendance
+------------------------------------------------------------------ */
+exports.rejectAttendance = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body || {};
+    const attendance = await Attendance.findById(id);
+    if (!attendance) return res.status(404).json({ message: 'Attendance not found' });
+
+    if (attendance.approvalStatus !== 'Pending') {
+      return res.status(400).json({ message: 'Attendance already processed.' });
+    }
+
+    attendance.approvalStatus = 'Rejected';
+    attendance.rejectionReason = reason || 'No reason provided';
+    await attendance.save();
+
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: attendance.email,
+      subject: '❌ Attendance Rejected',
+      html: `
+        Hi ${attendance.name},<br><br>
+        Your attendance for <b>${attendance.date.toDateString()}</b> was <b>REJECTED</b>.<br>
+        Reason: ${attendance.rejectionReason}<br><br>
+        Please mark attendance again. After 11:00 AM only Half Day or Remote Work is allowed.
+      `,
+    });
+
+    res.json({ message: 'Attendance rejected successfully.', attendance });
+  } catch (err) {
+    console.error('❌ Reject error:', err);
+    res.status(500).json({ message: 'Error rejecting attendance.', error: err.message });
   }
 };
 

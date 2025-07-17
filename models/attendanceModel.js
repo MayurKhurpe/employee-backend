@@ -23,6 +23,20 @@ const attendanceSchema = new mongoose.Schema({
     enum: ['Present', 'Absent', 'Leave', 'Half Day', 'Remote Work', 'Late Mark'],
     required: true,
   },
+  requestedStatus: {
+    type: String,
+    trim: true,
+  },
+  approvalStatus: {
+    type: String,
+    enum: ['Pending', 'Approved', 'Rejected'],
+    default: 'Pending',
+  },
+  rejectionReason: {
+    type: String,
+    trim: true,
+    default: '',
+  },
   checkInTime: {
     type: String,
   },

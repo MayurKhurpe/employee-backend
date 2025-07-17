@@ -5,13 +5,37 @@ const attendanceController = require('../controllers/attendanceController');
 const AuditLog = require('../models/AuditLog');
 const nodemailer = require('nodemailer'); // ✅ Email
 
-// ✅ Mark Attendance with Audit Logging + Location Required
+const {
+  markAttendance,
+  getMyAttendance,
+  getMySummary,
+  getAllAttendance,
+  getUserAttendance,
+  updateCheckout,
+  getSummary,
+  getAllUsers,
+  approveAttendance,
+  rejectAttendance,
+} = attendanceController;
+
+// ✅ Only HR email or Admin can approve/reject
+function isHrOnly(req, res, next) {
+  if (
+    req.user?.email === 'hr.seekersautomation@gmail.com' ||
+    req.user?.role === 'admin'
+  ) {
+    return next();
+  }
+  return res.status(403).json({ message: 'HR/Admin only.' });
+}
+
+// ✅ Mark Attendance with Audit Logging + Location Required (for in-office)
 router.post('/mark', protect, async (req, res, next) => {
   const { location, status } = req.body;
 
-  // ✅ Block attendance if location is not provided
-  if (!location || !location.lat || !location.lng) {
-    return res.status(400).json({ message: '📍 Location is required to mark attendance.' });
+  // ✅ Require location ONLY for in-office types
+  if ((status === 'Present' || status === 'Half Day') && (!location || !location.lat || !location.lng)) {
+    return res.status(400).json({ message: '📍 Location is required for in-office attendance.' });
   }
 
   // ✅ Optional: Distance check from office location
@@ -21,21 +45,17 @@ router.post('/mark', protect, async (req, res, next) => {
 
   const toRad = (val) => (val * Math.PI) / 180;
   const R = 6371;
-  const dLat = toRad(officeLat - location.lat);
-  const dLng = toRad(officeLng - location.lng);
+  const dLat = toRad(officeLat - (location?.lat ?? officeLat));
+  const dLng = toRad(officeLng - (location?.lng ?? officeLng));
   const a =
     Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(location.lat)) * Math.cos(toRad(officeLat)) *
+    Math.cos(toRad(location?.lat ?? officeLat)) * Math.cos(toRad(officeLat)) *
     Math.sin(dLng / 2) ** 2;
   const distance = 2 * R * Math.asin(Math.sqrt(a));
-
   const isOutside = distance > radiusInKm;
 
-  // ✅ Optional: log or alert if user is outside
+  // ✅ Send alert email to admin if outside & claimed in-office
   if (isOutside && (status === 'Present' || status === 'Half Day')) {
-    console.log(`📍 Outside office radius: ${distance.toFixed(2)} km`);
-
-    // ✅ Send alert email to admin
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
@@ -56,26 +76,20 @@ router.post('/mark', protect, async (req, res, next) => {
         <p><strong>Distance:</strong> ${distance.toFixed(2)} km</p>
         <p><strong>Time:</strong> ${new Date().toLocaleString()}</p>
       `,
-      if (usedOfficeWiFi) {
-  outsideLocationHtml += `<p style="color: green;"><strong>✅ Verified via Office WiFi</strong></p>`;
-}
     };
 
     transporter.sendMail(mailOptions, (error, info) => {
-      if (error) {
-        console.error('❌ Failed to send admin email:', error);
-      } else {
-        console.log('✅ Email sent to admin:', info.response);
-      }
+      if (error) console.error('❌ Failed to send admin email:', error);
+      else console.log('✅ Email sent to admin:', info.response);
     });
   }
 
   // ✅ Continue with controller
-  await attendanceController.markAttendance(req, res, async () => {
+  await markAttendance(req, res, async () => {
     await AuditLog.create({
       user: req.user,
       action: 'Marked Attendance',
-      details: `Status: ${req.body.status}`,
+      details: `Status: ${status}`,
       ip: req.ip,
     });
     next();
@@ -83,20 +97,20 @@ router.post('/mark', protect, async (req, res, next) => {
 });
 
 // ✅ Get logged-in user's full attendance
-router.get('/my', protect, attendanceController.getMyAttendance);
+router.get('/my', protect, getMyAttendance);
 
 // ✅ Get logged-in user's summary (for dashboard)
-router.get('/my-summary', protect, attendanceController.getMySummary);
+router.get('/my-summary', protect, getMySummary);
 
 // ✅ Admin: Get all attendance
-router.get('/all', protect, isAdmin, attendanceController.getAllAttendance);
+router.get('/all', protect, isAdmin, getAllAttendance);
 
 // ✅ Admin: Get specific user's attendance
-router.get('/user/:userId', protect, isAdmin, attendanceController.getUserAttendance);
+router.get('/user/:userId', protect, isAdmin, getUserAttendance);
 
 // ✅ Update check-out time with Audit Logging
 router.patch('/:id', protect, async (req, res, next) => {
-  await attendanceController.updateCheckout(req, res, async () => {
+  await updateCheckout(req, res, async () => {
     await AuditLog.create({
       user: req.user,
       action: 'Updated Checkout Time',
@@ -108,6 +122,12 @@ router.patch('/:id', protect, async (req, res, next) => {
 });
 
 // ✅ Admin: Daily attendance summary (e.g., for charts, reports)
-router.get('/summary', protect, isAdmin, attendanceController.getSummary);
+router.get('/summary', protect, isAdmin, getSummary);
+
+// ✅ HR/Admin: Approve Attendance
+router.put('/approve/:id', protect, isHrOnly, approveAttendance);
+
+// ✅ HR/Admin: Reject Attendance
+router.put('/reject/:id', protect, isHrOnly, rejectAttendance);
 
 module.exports = router;
