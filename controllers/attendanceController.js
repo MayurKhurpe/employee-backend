@@ -237,10 +237,31 @@ exports.getAllAttendance = async (req, res) => {
     if (userId) filter.userId = userId;
 
     const marked = await Attendance.find(filter);
-    // ✅ Count Late Marks for each user in current filter
+  // ✅ Determine month range for Late Mark counting
+let monthStart, monthEnd;
+if (month) {
+  const [y, m] = month.split('-').map(Number);
+  monthStart = new Date(y, m - 1, 1);
+  monthEnd = new Date(y, m, 0, 23, 59, 59, 999);
+} else {
+  // use queryDate if provided, else today
+  const baseDate = queryDate || new Date();
+  monthStart = new Date(baseDate.getFullYear(), baseDate.getMonth(), 1);
+  monthEnd = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 0, 23, 59, 59, 999);
+}
+
+// ✅ Count Late Marks for each user in the month range (NOT just the day)
+const lateMarksMatch = {
+  date: { $gte: monthStart, $lte: monthEnd },
+  status: 'Late Mark',
+};
+if (userId) {
+  lateMarksMatch.userId = typeof userId === 'string' ? require('mongoose').Types.ObjectId(userId) : userId;
+}
+
 const lateMarksCount = await Attendance.aggregate([
-  { $match: { ...filter, status: 'Late Mark' } },
-  { $group: { _id: '$userId', count: { $sum: 1 } } }
+  { $match: lateMarksMatch },
+  { $group: { _id: '$userId', count: { $sum: 1 } } },
 ]);
 
 const lateMarksMap = new Map();
