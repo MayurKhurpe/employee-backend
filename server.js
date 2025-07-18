@@ -19,7 +19,7 @@ pass: emailPass,
   },
 });
 
-const { jwtSecret, frontendURL, emailUser, emailPass } = require('./config');
+const { jwtSecret, frontendURL } = require('./config');
 const User = require('./models/User');
 const { protect, isAdmin } = require('./middleware/auth');
 
