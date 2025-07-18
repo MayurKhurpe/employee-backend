@@ -278,3 +278,78 @@ exports.getAllAttendance = async (req, res) => {
     res.status(500).json({ message: 'Error fetching attendance.', error: err.message });
   }
 };
+/* ===============================================================
+   7️⃣ GET MY SUMMARY
+================================================================*/
+exports.getMySummary = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { month } = req.query;
+
+    const filter = { userId };
+    if (month) {
+      const [year, mon] = month.split('-').map(Number);
+      const start = new Date(year, mon - 1, 1);
+      const end = new Date(year, mon, 0, 23, 59, 59, 999);
+      filter.date = { $gte: start, $lte: end };
+    }
+
+    const records = await Attendance.find(filter);
+    const totalDays = records.length;
+    const present = records.filter(r => r.status === 'Present').length;
+    const lateMarks = records.filter(r => r.status === 'Late Mark').length;
+    const halfDays = records.filter(r => r.status === 'Half Day').length;
+    const absent = records.filter(r => r.status === 'Absent').length;
+
+    res.json({ totalDays, present, lateMarks, halfDays, absent });
+  } catch (err) {
+    res.status(500).json({ message: 'Error fetching summary.', error: err.message });
+  }
+};
+
+/* ===============================================================
+   8️⃣ GET USER ATTENDANCE (Admin)
+================================================================*/
+exports.getUserAttendance = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { month } = req.query;
+
+    const filter = { userId };
+    if (month) {
+      const [year, mon] = month.split('-').map(Number);
+      const start = new Date(year, mon - 1, 1);
+      const end = new Date(year, mon, 0, 23, 59, 59, 999);
+      filter.date = { $gte: start, $lte: end };
+    }
+
+    const records = await Attendance.find(filter).sort({ date: -1 });
+    res.json(records);
+  } catch (err) {
+    res.status(500).json({ message: 'Error fetching user attendance.', error: err.message });
+  }
+};
+
+/* ===============================================================
+   9️⃣ GET DAILY SUMMARY (Admin)
+================================================================*/
+exports.getSummary = async (req, res) => {
+  try {
+    const { date } = req.query;
+    const targetDate = date ? new Date(date) : new Date();
+    targetDate.setHours(0, 0, 0, 0);
+
+    const records = await Attendance.find({ date: targetDate });
+    const summary = {
+      present: records.filter(r => r.status === 'Present').length,
+      halfDay: records.filter(r => r.status === 'Half Day').length,
+      lateMark: records.filter(r => r.status === 'Late Mark').length,
+      remoteWork: records.filter(r => r.status === 'Remote Work').length,
+      absent: records.filter(r => r.status === 'Absent').length,
+    };
+
+    res.json({ date: targetDate.toDateString(), summary });
+  } catch (err) {
+    res.status(500).json({ message: 'Error fetching summary.', error: err.message });
+  }
+};
