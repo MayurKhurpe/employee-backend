@@ -374,25 +374,27 @@ exports.getAllAttendance = async (req, res) => {
           ? marked.find((r) => r.userId.toString() === user._id.toString())
           : map.get(user._id.toString() + queryDate?.toISOString());
 
-        return {
-          ...(key
-            ? key.toObject()
-            : {
-                _id: 'not-marked-' + user._id,
-                userId: user._id,
-                name: user.name,
-                email: user.email,
-                date: queryDate || new Date(),
-                status: 'Not Marked Yet',
-                checkInTime: null,
-                checkOutTime: null,
-                location: '—',
-                customer: '—',
-                workLocation: '—',
-                assignedBy: '—',
-              }),
-          lateMarks: lateMarksMap.get(user._id.toString()) || 0, // ✅ Add Late Mark Count
-        };
+return {
+  ...(key
+    ? key.toObject()
+    : {
+        _id: 'not-marked-' + user._id,
+        userId: user._id,
+        name: user.name,
+        email: user.email,
+        date: queryDate || new Date(),
+        status: 'Not Marked Yet',
+        checkInTime: null,
+        checkOutTime: null,
+        location: '—',
+        customer: '—',
+        workLocation: '—',
+        assignedBy: '—',
+      }),
+  approvalStatus: key ? key.approvalStatus || 'N/A' : 'N/A',
+  requestedStatus: key ? key.requestedStatus || 'N/A' : 'N/A',
+  lateMarks: lateMarksMap.get(user._id.toString()) || 0,
+};
       });
 
       if (month) {
