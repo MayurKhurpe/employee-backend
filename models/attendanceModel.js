@@ -8,10 +8,12 @@ const attendanceSchema = new mongoose.Schema({
   },
   name: {
     type: String,
+    required: true,
     trim: true,
   },
   email: {
     type: String,
+    required: true,
     lowercase: true,
   },
   date: {
@@ -21,11 +23,12 @@ const attendanceSchema = new mongoose.Schema({
   status: {
     type: String,
     enum: ['Present', 'Absent', 'Leave', 'Half Day', 'Remote Work', 'Late Mark'],
-    required: true,
+    default: 'Present',
   },
   requestedStatus: {
     type: String,
     trim: true,
+    default: '',
   },
   approvalStatus: {
     type: String,
@@ -39,25 +42,22 @@ const attendanceSchema = new mongoose.Schema({
   },
   checkInTime: {
     type: String,
+    default: '',
   },
   checkOutTime: {
     type: String,
+    default: '',
   },
   location: {
-    type: String, // Will store "Office" or "lat,lng" string
-    default: 'Office',
+    type: {
+      lat: { type: Number },
+      lng: { type: Number },
+    },
+    default: null,
   },
-  customer: {
-    type: String,
-  },
-  workLocation: {
-    type: String,
-  },
-  assignedBy: {
-    type: String,
-  },
-}, {
-  timestamps: true,
-});
+  customer: { type: String },
+  workLocation: { type: String },
+  assignedBy: { type: String },
+}, { timestamps: true });
 
 module.exports = mongoose.models.Attendance || mongoose.model('Attendance', attendanceSchema);

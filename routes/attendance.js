@@ -4,6 +4,7 @@ const { protect, isAdmin } = require('../middleware/auth');
 const attendanceController = require('../controllers/attendanceController');
 const AuditLog = require('../models/AuditLog');
 const nodemailer = require('nodemailer'); // ✅ Email
+const Attendance = require('../models/attendanceModel');
 
 const {
   markAttendance,
@@ -29,7 +30,7 @@ function isHrOnly(req, res, next) {
 }
 
 // ✅ Mark Attendance with Audit Logging + Location Required (for in-office)
-router.post('/mark', protect, async (req, res, next) => {
+router.post('/mark', protect, async (req, res) => {
   const { location, status } = req.body;
 
   // ✅ Require location ONLY for in-office types
@@ -83,16 +84,16 @@ router.post('/mark', protect, async (req, res, next) => {
     });
   }
 
-  // ✅ Continue with controller
-  await markAttendance(req, res, async () => {
-    await AuditLog.create({
-      user: req.user,
-      action: 'Marked Attendance',
-      details: `Status: ${status}`,
-      ip: req.ip,
-    });
-    next();
-  });
+  // ✅ Call controller
+  await markAttendance(req, res);
+
+  // ✅ Log AFTER markAttendance (non-blocking)
+  AuditLog.create({
+    user: req.user,
+    action: 'Marked Attendance',
+    details: `Status: ${status}`,
+    ip: req.ip,
+  }).catch(err => console.error('AuditLog error:', err));
 });
 
 // ✅ Get logged-in user's full attendance
@@ -108,16 +109,15 @@ router.get('/all', protect, isAdmin, getAllAttendance);
 router.get('/user/:userId', protect, isAdmin, getUserAttendance);
 
 // ✅ Update check-out time with Audit Logging
-router.patch('/:id', protect, async (req, res, next) => {
-  await updateCheckout(req, res, async () => {
-    await AuditLog.create({
-      user: req.user,
-      action: 'Updated Checkout Time',
-      details: `Attendance ID: ${req.params.id}`,
-      ip: req.ip,
-    });
-    next();
-  });
+router.patch('/:id', protect, async (req, res) => {
+  await updateCheckout(req, res);
+
+  AuditLog.create({
+    user: req.user,
+    action: 'Updated Checkout Time',
+    details: `Attendance ID: ${req.params.id}`,
+    ip: req.ip,
+  }).catch(err => console.error('AuditLog error:', err));
 });
 
 // ✅ Admin: Daily attendance summary (e.g., for charts, reports)
@@ -128,5 +128,27 @@ router.put('/approve/:id', protect, isHrOnly, approveAttendance);
 
 // ✅ HR/Admin: Reject Attendance
 router.put('/reject/:id', protect, isHrOnly, rejectAttendance);
+
+// ✅ Auto-marked Absent count (today, no check-in)
+router.get('/auto-marked', protect, isAdmin, async (req, res) => {
+  try {
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date();
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const autoAbsent = await Attendance.find({
+      date: { $gte: startOfDay, $lte: endOfDay },
+      status: 'Absent',
+      $or: [{ checkInTime: null }, { checkInTime: '' }, { checkInTime: { $exists: false } }],
+    });
+
+    res.json({ count: autoAbsent.length });
+  } catch (err) {
+    console.error('Error fetching auto-marked:', err);
+    res.status(500).json({ error: 'Failed to fetch auto-marked data' });
+  }
+});
 
 module.exports = router;

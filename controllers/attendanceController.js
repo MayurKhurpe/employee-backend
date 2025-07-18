@@ -250,10 +250,16 @@ exports.getAllAttendance = async (req, res) => {
     }
     if (userId) filter.userId = mongoose.Types.ObjectId(userId);
 
-    const records = await Attendance.find(filter).sort({ date: -1 });
-    const skip = (page - 1) * limit;
-    const paginated = records.slice(skip, skip + Number(limit));
-    res.json({ records: paginated, totalPages: Math.ceil(records.length / limit) });
+const records = await Attendance.find(filter).sort({ date: -1 });
+const skip = (page - 1) * limit;
+const paginated = records.slice(skip, skip + Number(limit));
+
+const result = paginated.map(rec => ({
+  ...rec.toObject(),
+  isLate: rec.status.toLowerCase() === 'late mark',
+}));
+
+res.json({ records: result, totalPages: Math.ceil(records.length / limit) });
   } catch (err) {
     res.status(500).json({ message: 'Error fetching attendance.', error: err.message });
   }

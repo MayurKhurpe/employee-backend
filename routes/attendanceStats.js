@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const Attendance = require('../models/Attendance');
+const Attendance = require('../models/attendanceModel');
 
 // GET /api/attendance/auto-marked
 router.get('/auto-marked', async (req, res) => {
