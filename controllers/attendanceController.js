@@ -331,6 +331,19 @@ exports.getMySummary = async (req, res) => {
 };
 
 /* ===============================================================
+   🔟 GET SPECIFIC USER'S ATTENDANCE (Admin)
+================================================================*/
+exports.getUserAttendance = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const records = await Attendance.find({ userId }).sort({ date: -1 });
+    res.status(200).json(records);
+  } catch (err) {
+    res.status(500).json({ message: 'Error fetching user attendance.', error: err.message });
+  }
+};
+
+/* ===============================================================
    9️⃣ GET ALL USERS (Admin)
 ================================================================*/
 exports.getAllUsers = async (req, res) => {
