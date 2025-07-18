@@ -13,7 +13,6 @@ const {
   getUserAttendance,
   updateCheckout,
   getSummary,
-  getAllUsers,
   approveAttendance,
   rejectAttendance,
 } = attendanceController;
