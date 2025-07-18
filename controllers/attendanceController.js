@@ -250,113 +250,31 @@ exports.getAllAttendance = async (req, res) => {
     }
     if (userId) filter.userId = mongoose.Types.ObjectId(userId);
 
-const records = await Attendance.find(filter).sort({ date: -1 });
-const skip = (page - 1) * limit;
-const paginated = records.slice(skip, skip + Number(limit));
+    // ✅ Fetch records
+    const records = await Attendance.find(filter).sort({ date: -1 });
 
-const result = paginated.map(rec => ({
-  ...rec.toObject(),
-  isLate: rec.status.toLowerCase() === 'late mark',
-}));
-
-res.json({ records: result, totalPages: Math.ceil(records.length / limit) });
-  } catch (err) {
-    res.status(500).json({ message: 'Error fetching attendance.', error: err.message });
-  }
-};
-
-/* ===============================================================
-   7️⃣ SUMMARY
-================================================================*/
-exports.getSummary = async (req, res) => {
-  try {
-    const { date, month, userId } = req.query;
-    const mongoose = require('mongoose');
-    let filter = {};
-
-    if (date) filter.date = getStartOfDay(new Date(date));
-    else if (month) {
-      const [y, m] = month.split('-').map(Number);
-      const start = new Date(y, m - 1, 1);
-      const end = new Date(y, m, 0, 23, 59, 59, 999);
-      filter.date = { $gte: start, $lte: end };
-    }
-    if (userId) filter.userId = mongoose.Types.ObjectId(userId);
-
-    const allUsers = await User.find({ role: 'employee' });
-    const todayRecords = await Attendance.find(filter);
-
-    let counts = { present: 0, absent: 0, halfDay: 0, remote: 0, lateMark: 0 };
-    todayRecords.forEach((r) => {
-      const s = r.status.toLowerCase();
-      if (s === 'present') counts.present++;
-      else if (s === 'absent') counts.absent++;
-      else if (s === 'half day') counts.halfDay++;
-      else if (s === 'remote work') counts.remote++;
-      else if (s === 'late mark') counts.lateMark++;
+    // ✅ Calculate Late Marks count
+    const lateMarksCount = {};
+    records.forEach(r => {
+      if ((r.status || '').toLowerCase() === 'late mark') {
+        const uid = r.userId.toString();
+        lateMarksCount[uid] = (lateMarksCount[uid] || 0) + 1;
+      }
     });
 
-    const markedUserIds = new Set(todayRecords.map((r) => r.userId.toString()));
-    const unmarked = allUsers.filter((u) => !markedUserIds.has(u._id.toString())).length;
-    counts.absent += unmarked;
+    // ✅ Pagination
+    const skip = (page - 1) * limit;
+    const paginated = records.slice(skip, skip + Number(limit));
 
-    res.json({ ...counts, totalEmployees: allUsers.length });
+    // ✅ Add lateMarks in response
+    const result = paginated.map(rec => ({
+      ...rec.toObject(),
+      lateMarks: lateMarksCount[rec.userId.toString()] || 0,
+    }));
+
+    res.json({ records: result, totalPages: Math.ceil(records.length / limit) });
+
   } catch (err) {
-    res.status(500).json({ message: 'Error fetching summary.', error: err.message });
-  }
-};
-
-/* ===============================================================
-   8️⃣ GET MY SUMMARY
-================================================================*/
-exports.getMySummary = async (req, res) => {
-  try {
-    const userId = req.user.userId;
-    const today = new Date();
-    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    const records = await Attendance.find({ userId, date: { $gte: startOfMonth, $lte: today } });
-
-    let summary = { present: 0, halfDay: 0, remoteWork: 0, absent: 0, lateMarks: 0 };
-    for (let d = new Date(startOfMonth); d <= today; d.setDate(d.getDate() + 1)) {
-      const rec = records.find((r) => new Date(r.date).toDateString() === d.toDateString());
-      if (!rec) summary.absent++;
-      else {
-        const s = rec.status.toLowerCase();
-        if (s === 'present') summary.present++;
-        else if (s === 'half day') summary.halfDay++;
-        else if (s === 'remote work') summary.remoteWork++;
-        else if (s === 'absent') summary.absent++;
-        else if (s === 'late mark') summary.lateMarks++;
-      }
-    }
-
-    res.json({ ...summary, totalDays: summary.present + summary.absent + summary.halfDay + summary.remoteWork });
-  } catch (err) {
-    res.status(500).json({ message: 'Error fetching summary.', error: err.message });
-  }
-};
-
-/* ===============================================================
-   🔟 GET SPECIFIC USER'S ATTENDANCE (Admin)
-================================================================*/
-exports.getUserAttendance = async (req, res) => {
-  try {
-    const { userId } = req.params;
-    const records = await Attendance.find({ userId }).sort({ date: -1 });
-    res.status(200).json(records);
-  } catch (err) {
-    res.status(500).json({ message: 'Error fetching user attendance.', error: err.message });
-  }
-};
-
-/* ===============================================================
-   9️⃣ GET ALL USERS (Admin)
-================================================================*/
-exports.getAllUsers = async (req, res) => {
-  try {
-    const users = await User.find().select('name email role isApproved isVerified joiningDate bloodGroup');
-    res.status(200).json(users);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch users' });
+    res.status(500).json({ message: 'Error fetching attendance.', error: err.message });
   }
 };
