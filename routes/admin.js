@@ -7,7 +7,7 @@ const isAdmin = require('../middleware/isAdmin');
 // ⬇️ Models
 const User = require('../models/User');
 const LeaveRequest = require('../models/LeaveRequest');
-const Attendance = require('../models/Attendance');
+const Attendance = require('../models/attendanceModel');
 
 // 🔐 Protect all admin routes
 router.use(protect, isAdmin);
