@@ -9,8 +9,15 @@ const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const helmet = require('helmet');
 require('dotenv').config();
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+user: emailUser,
+pass: emailPass,
+  },
+});
 
-const { jwtSecret } = require('./config');
+const { jwtSecret, frontendURL, emailUser, emailPass } = require('./config');
 const User = require('./models/User');
 const { protect, isAdmin } = require('./middleware/auth');
 
@@ -156,18 +163,11 @@ app.post('/api/forgot-password', async (req, res) => {
   if (!user) return res.status(404).json({ error: 'User not found' });
 
   const token = crypto.randomBytes(32).toString('hex');
-  user.resetToken = token;
-  user.tokenExpiry = Date.now() + 3600000;
+user.resetToken = token;
+user.resetTokenExpires = Date.now() + 3600000;
   await user.save();
 
   const resetLink = `${FRONTEND_URL}/reset-password/${token}`;
-  const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-  });
 
   const mailOptions = {
     from: process.env.EMAIL_USER,
@@ -189,13 +189,13 @@ app.post('/api/reset-password/:token', async (req, res) => {
   const { token } = req.params;
   const { password } = req.body;
 
-  const user = await User.findOne({ resetToken: token, tokenExpiry: { $gt: Date.now() } });
+  const user = await User.findOne({ resetToken: token, resetTokenExpires: { $gt: Date.now() } });
   if (!user) return res.status(400).json({ error: 'Token expired or invalid' });
 
   const hashed = await bcrypt.hash(password, 10);
   user.password = hashed;
   user.resetToken = undefined;
-  user.tokenExpiry = undefined;
+  user.resetTokenExpires = undefined;
   await user.save();
 
   res.json({ message: 'Password reset successful' });

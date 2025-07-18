@@ -3,7 +3,6 @@ const router = express.Router();
 const { protect, isAdmin } = require('../middleware/auth');
 const leaveController = require('../controllers/leaveController');
 const LeaveRequest = require('../models/LeaveRequest');
-const User = require('../models/User');
 
 // ✅ Apply Leave
 router.post('/', protect, leaveController.applyLeave);
@@ -17,14 +16,26 @@ router.get('/admin/all', protect, isAdmin, async (req, res) => {
     const { userId, month } = req.query;
     const query = {};
 
-    if (userId) query.userId = userId;
+    if (userId) {
+  const mongoose = require('mongoose');
+  if (mongoose.Types.ObjectId.isValid(userId)) {
+    query.userId = new mongoose.Types.ObjectId(userId);
+  } else {
+    return res.status(400).json({ error: 'Invalid userId' });
+  }
+}
 
-    if (month) {
-      const startOfMonth = new Date(`${month}-01`);
-      const endOfMonth = new Date(startOfMonth);
-      endOfMonth.setMonth(endOfMonth.getMonth() + 1);
-      query.startDate = { $gte: startOfMonth, $lt: endOfMonth };
-    }
+if (month) {
+  // month expected: YYYY-MM
+  const [y, m] = month.split('-').map(Number);
+  if (!y || !m || m < 1 || m > 12) {
+    return res.status(400).json({ error: 'Invalid month format. Use YYYY-MM.' });
+  }
+  const startOfMonth = new Date(y, m - 1, 1);
+  const endOfMonth = new Date(y, m, 1); // next month start (exclusive)
+  query.startDate = { $gte: startOfMonth, $lt: endOfMonth };
+}
+
 
     const leaves = await LeaveRequest.find(query)
       .populate('userId', 'name email')

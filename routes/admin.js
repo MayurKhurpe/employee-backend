@@ -105,6 +105,31 @@ router.delete('/delete-user', async (req, res) => {
   }
 });
 
+// ✅ Update user details (Admin can edit)
+router.put('/update-user/:id', async (req, res) => {
+  try {
+    const updates = req.body;
+    const user = await User.findByIdAndUpdate(req.params.id, updates, { new: true });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json({ message: 'User updated successfully', user });
+  } catch (err) {
+    console.error('❌ Error updating user:', err);
+    res.status(500).json({ error: 'Failed to update user' });
+  }
+});
+
+// ✅ Get single user details by ID
+router.get('/user/:id', async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).select('-password');
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json(user);
+  } catch (err) {
+    console.error('❌ Error fetching user details:', err);
+    res.status(500).json({ error: 'Failed to fetch user details' });
+  }
+});
+
 router.get('/export-users', async (req, res) => {
   try {
     const users = await User.find({ isApproved: true }).select('name email role');

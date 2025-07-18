@@ -8,6 +8,7 @@ const { protect } = require('../middleware/auth');
 // ✅ Public routes
 router.post('/register', authController.register);
 router.get('/verify-email/:token', authController.verifyEmail);
+router.get('/ping', (req, res) => res.json({ message: 'Backend is live ✅' }));
 router.post('/login', authController.login);
 
 // ✅ New OTP Password Reset Routes

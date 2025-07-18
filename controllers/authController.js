@@ -15,6 +15,11 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+transporter.verify((err, success) => {
+  if (err) console.error('Email transporter error:', err);
+  else console.log('✅ Email server ready');
+});
+
 // ✅ Email Mask Helper
 function maskEmail(email) {
   const [user, domain] = email.split('@');
@@ -198,7 +203,7 @@ exports.setNewPassword = async (req, res) => {
 exports.changePassword = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
-    const userId = req.user.id;
+    const userId = req.user.userId;
 
     if (!currentPassword || !newPassword) {
       return res.status(400).json({ error: 'Current and new passwords required' });

@@ -46,6 +46,10 @@ const updateProfile = async (req, res) => {
      user.joiningDate = joiningDate ? new Date(joiningDate) : user.joiningDate;
      user.dob = dob ? new Date(dob) : user.dob;
 
+  if (req.file) {
+  user.profilePicture = `/uploads/${req.file.filename}`;
+}
+
     await user.save();
 
     const updatedUser = await User.findById(user._id).select('-password');
