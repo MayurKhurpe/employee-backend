@@ -106,36 +106,41 @@ exports.markAttendance = async (req, res) => {
 
     await newAttendance.save();
 
-    if (['Present', 'Half Day'].includes(status) && outsideLocation) {
-      await transporter.sendMail({
-        from: process.env.EMAIL_USER,
-        to: 'hr.seekersautomation@gmail.com',
-        subject: `⚠ Outside Attendance Alert - ${user.name}`,
-        html: `
-          <h3>⚠ ${user.name} marked ${status} outside office location</h3>
-          <p><strong>Date:</strong> ${today.toDateString()}</p>
-          <p><strong>Email:</strong> ${user.email}</p>
-          <p><strong>Check-in Time:</strong> ${checkInTime || '—'}</p>
-          <p><strong>Location:</strong> ${location ? `Lat: ${location.lat}, Lng: ${location.lng}` : 'Not Available'}</p>
-        `
-      });
-    }
-
+if (['Present', 'Half Day'].includes(status) && outsideLocation) {
+  try {
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
-      to: user.email,
-      subject: '📝 Attendance Submitted - Pending Approval',
+      to: 'hr.seekersautomation@gmail.com',
+      subject: `⚠ Outside Attendance Alert - ${user.name}`,
       html: `
-        Hi ${user.name},<br><br>
-        Your attendance for <b>${dayjs(today).tz('Asia/Kolkata').format('DD MMM YYYY')}</b> has been submitted as <b>${status}</b>.<br>
-        Current status: <b>Pending HR Approval</b>.
+        <h3>⚠ ${user.name} marked ${status} outside office location</h3>
+        <p><strong>Date:</strong> ${today.toDateString()}</p>
+        <p><strong>Email:</strong> ${user.email}</p>
+        <p><strong>Check-in Time:</strong> ${checkInTime || '—'}</p>
+        <p><strong>Location:</strong> ${location ? `Lat: ${location.lat}, Lng: ${location.lng}` : 'Not Available'}</p>
       `
     });
+  } catch(e){ console.error('Mail warn error:', e.message); }
+}
+
+try {
+  await transporter.sendMail({
+    from: process.env.EMAIL_USER,
+    to: user.email,
+    subject: '📝 Attendance Submitted - Pending Approval',
+    html: `
+      Hi ${user.name},<br><br>
+      Your attendance for <b>${dayjs(today).tz('Asia/Kolkata').format('DD MMM YYYY')}</b> has been submitted as <b>${status}</b>.<br>
+      Current status: <b>Pending HR Approval</b>.
+    `
+  });
+} catch(e){ console.error('Mail user error:', e.message); }
 
     res.status(201).json({ message: 'Attendance submitted (Pending approval).', attendance: newAttendance });
-  } catch (err) {
-    res.status(500).json({ message: 'Error marking attendance.', error: err.message });
-  }
+} catch (err) {
+  console.error('markAttendance error:', err); // <-- ADD THIS LINE
+  res.status(500).json({ message: 'Error marking attendance.', error: err.message });
+}
 };
 
 /* ===============================================================

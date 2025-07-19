@@ -30,71 +30,7 @@ function isHrOnly(req, res, next) {
 }
 
 // ✅ Mark Attendance with Audit Logging + Location Required (for in-office)
-router.post('/mark', protect, async (req, res) => {
-  const { location, status } = req.body;
-
-  // ✅ Require location ONLY for in-office types
-  if ((status === 'Present' || status === 'Half Day') && (!location || !location.lat || !location.lng)) {
-    return res.status(400).json({ message: '📍 Location is required for in-office attendance.' });
-  }
-
-  // ✅ Optional: Distance check from office location
-  const officeLat = 18.641478;
-  const officeLng = 73.795228;
-  const radiusInKm = 0.1;
-
-  const toRad = (val) => (val * Math.PI) / 180;
-  const R = 6371;
-  const dLat = toRad(officeLat - (location?.lat ?? officeLat));
-  const dLng = toRad(officeLng - (location?.lng ?? officeLng));
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(location?.lat ?? officeLat)) * Math.cos(toRad(officeLat)) *
-    Math.sin(dLng / 2) ** 2;
-  const distance = 2 * R * Math.asin(Math.sqrt(a));
-  const isOutside = distance > radiusInKm;
-
-  // ✅ Send alert email to admin if outside & claimed in-office
-  if (isOutside && (status === 'Present' || status === 'Half Day')) {
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.ALERT_EMAIL,
-        pass: process.env.ALERT_EMAIL_PASS,
-      },
-    });
-
-    const mailOptions = {
-      from: process.env.ALERT_EMAIL,
-      to: process.env.ADMIN_EMAIL,
-      subject: '⚠ Outside Office Attendance Alert',
-      html: `
-        <h3>🚨 Outside Office Attendance Detected</h3>
-        <p><strong>User:</strong> ${req.user.name} (${req.user.email})</p>
-        <p><strong>Status:</strong> ${status}</p>
-        <p><strong>Location:</strong> ${location.lat}, ${location.lng}</p>
-        <p><strong>Distance:</strong> ${distance.toFixed(2)} km</p>
-        <p><strong>Time:</strong> ${new Date().toLocaleString()}</p>
-      `,
-    };
-
-    transporter.sendMail(mailOptions, (error, info) => {
-      if (error) console.error('❌ Failed to send admin email:', error);
-      else console.log('✅ Email sent to admin:', info.response);
-    });
-  }
-
-  // ✅ Call controller
-  await markAttendance(req, res);
-
-  // ✅ Log AFTER markAttendance (non-blocking)
-  AuditLog.create({
-    user: req.user,
-    action: 'Marked Attendance',
-    details: `Status: ${status}`,
-    ip: req.ip,
-  }).catch(err => console.error('AuditLog error:', err));
-});
+router.post('/mark', protect, markAttendance);
 
 // ✅ Get logged-in user's full attendance
 router.get('/my', protect, getMyAttendance);
