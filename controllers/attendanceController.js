@@ -241,13 +241,13 @@ exports.getAllAttendance = async (req, res) => {
     const mongoose = require('mongoose');
     let filter = {};
 
-    if (date) filter.date = getStartOfDay(new Date(date));
-    else if (month) {
-      const [y, m] = month.split('-').map(Number);
-      const start = new Date(y, m - 1, 1);
-      const end = new Date(y, m, 0, 23, 59, 59, 999);
-      filter.date = { $gte: start, $lte: end };
-    }
+if (date) {
+  const d = new Date(date);
+  const start = new Date(d.setHours(0, 0, 0, 0));
+  const end = new Date(d.setHours(23, 59, 59, 999));
+  filter.date = { $gte: start, $lte: end };
+}
+
     if (userId) filter.userId = mongoose.Types.ObjectId(userId);
 
     // ✅ Fetch records
@@ -339,7 +339,13 @@ exports.getSummary = async (req, res) => {
     const targetDate = date ? new Date(date) : new Date();
     targetDate.setHours(0, 0, 0, 0);
 
-    const records = await Attendance.find({ date: targetDate });
+    const startOfDay = new Date(targetDate);
+startOfDay.setHours(0, 0, 0, 0);
+
+const endOfDay = new Date(targetDate);
+endOfDay.setHours(23, 59, 59, 999);
+
+const records = await Attendance.find({ date: { $gte: startOfDay, $lte: endOfDay } });
     const summary = {
       present: records.filter(r => r.status === 'Present').length,
       halfDay: records.filter(r => r.status === 'Half Day').length,
