@@ -46,7 +46,8 @@ const transporter = nodemailer.createTransport({
     pass: process.env.EMAIL_PASS,
   },
 });
-
+// ✅ Office WiFi IPs (can be partial match)
+const OFFICE_WIFI_IPS = ['103.146.241.', '2401:4900'];
 /* ===============================================================
    1️⃣ MARK ATTENDANCE
 ================================================================*/
@@ -56,7 +57,8 @@ exports.markAttendance = async (req, res) => {
     if (!userId) return res.status(401).json({ message: 'Unauthorized' });
 
     const { status = 'Present', location = null, checkInTime, customer, workLocation, assignedBy } = req.body;
-
+const userIP = req.headers['x-forwarded-for'] || req.connection.remoteAddress || '';
+const isOfficeWiFi = userIP.includes(OFFICE_WIFI_IP);
     const nowIST = dayjs().tz('Asia/Kolkata');
     if (status === 'Present' && nowIST.isAfter(nowIST.hour(9).minute(45))) {
       return res.status(403).json({ message: '⛔ Marking Present not allowed after 9:45 AM IST. Use Late Mark.' });
@@ -85,8 +87,8 @@ exports.markAttendance = async (req, res) => {
       return res.status(400).json({ message: 'All remote work fields are required.' });
     }
 
-    const outsideLocation = ['Present', 'Half Day'].includes(status)
-      ? !location || !isWithinOffice(location.lat, location.lng)
+  const outsideLocation = ['Present', 'Half Day', 'Late Mark'].includes(status)
+      ? (!isOfficeWiFi && (!location || !isWithinOffice(location.lat, location.lng)))
       : false;
 
     const newAttendance = new Attendance({
