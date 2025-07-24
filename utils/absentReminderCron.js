@@ -30,6 +30,9 @@ const validStatuses = ['Present', 'Half Day', 'Remote Work', 'Late Mark'];
 cron.schedule('30 21 * * *', async () => {
   console.log('⏰ Running Absent Reminder Email Cron at 9:00 AM IST');
 
+    // 🚫 TEMPORARY: Disabled absent reminder emails
+  return;
+
   const tz = 'Asia/Kolkata';
   const startOfYesterday = dayjs().tz(tz).subtract(1, 'day').startOf('day').toDate();
   const startOfToday = dayjs().tz(tz).startOf('day').toDate();
